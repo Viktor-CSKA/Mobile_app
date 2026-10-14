@@ -39,6 +39,8 @@ dependencies:
   drift_flutter: ^0.3.1
   path_provider: ^2.1.6
   intl: ^0.20.3
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
