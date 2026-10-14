@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'features/budget/presentation/budget_screen.dart';
-import 'features/expenses/presentation/expenses_screen.dart';
+import 'features/calendar/presentation/calendar_screen.dart';
+import 'features/payments/presentation/payments_screen.dart';
 import 'features/settings/presentation/settings_screen.dart';
-import 'features/subscriptions/presentation/subscriptions_screen.dart';
+import 'features/upcoming/presentation/upcoming_screen.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -16,9 +16,9 @@ class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
   static const _screens = <Widget>[
-    ExpensesScreen(),
-    SubscriptionsScreen(),
-    BudgetScreen(),
+    UpcomingScreen(),
+    CalendarScreen(),
+    PaymentsScreen(),
     SettingsScreen(),
   ];
 
@@ -31,19 +31,19 @@ class _HomeShellState extends State<HomeShell> {
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
-            label: 'Расходы',
+            icon: Icon(Icons.notifications_active_outlined),
+            selectedIcon: Icon(Icons.notifications_active),
+            label: 'Ближайшие',
           ),
           NavigationDestination(
-            icon: Icon(Icons.autorenew_outlined),
-            selectedIcon: Icon(Icons.autorenew),
-            label: 'Подписки',
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: 'Календарь',
           ),
           NavigationDestination(
-            icon: Icon(Icons.pie_chart_outline),
-            selectedIcon: Icon(Icons.pie_chart),
-            label: 'Бюджет',
+            icon: Icon(Icons.payments_outlined),
+            selectedIcon: Icon(Icons.payments),
+            label: 'Платежи',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),

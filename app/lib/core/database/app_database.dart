@@ -3,35 +3,45 @@ import 'package:drift_flutter/drift_flutter.dart';
 
 part 'app_database.g.dart';
 
-/// Категории расходов. Суммы везде хранятся в копейках (int), без double.
+/// Категории платежей: ЖКХ, кредиты, подписки и т.д.
 class Categories extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text().withLength(min: 1, max: 50)();
   IntColumn get colorValue => integer()();
 }
 
-class Expenses extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  IntColumn get amountKopecks => integer()();
-  IntColumn get categoryId => integer().references(Categories, #id)();
-  TextColumn get note => text().withDefault(const Constant(''))();
-  DateTimeColumn get spentAt => dateTime()();
-}
-
-class Subscriptions extends Table {
+/// Регулярный платёж. Суммы везде в копейках (int), без double.
+class Payments extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text().withLength(min: 1, max: 80)();
-  IntColumn get amountKopecks => integer()();
+  IntColumn get categoryId => integer().references(Categories, #id)();
+
+  /// null — сумма переменная (например, ЖКХ), вводится при оплате.
+  IntColumn get amountKopecks => integer().nullable()();
+
+  /// Период повтора в месяцах: 1 — ежемесячно, 3 — раз в квартал, 12 — раз в год.
   IntColumn get periodMonths => integer().withDefault(const Constant(1))();
-  DateTimeColumn get nextChargeAt => dateTime()();
+  DateTimeColumn get nextDueAt => dateTime()();
   IntColumn get remindDaysBefore => integer().withDefault(const Constant(1))();
+
+  /// Дата окончания (кредит, рассрочка); null — бессрочно (подписка).
+  DateTimeColumn get endsAt => dateTime().nullable()();
+  TextColumn get note => text().withDefault(const Constant(''))();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 }
 
-@DriftDatabase(tables: [Categories, Expenses, Subscriptions])
+/// История оплат: отметка «оплачено» двигает nextDueAt вперёд.
+class PaymentRecords extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get paymentId => integer().references(Payments, #id)();
+  IntColumn get amountKopecks => integer()();
+  DateTimeColumn get paidAt => dateTime()();
+}
+
+@DriftDatabase(tables: [Categories, Payments, PaymentRecords])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor])
-    : super(executor ?? driftDatabase(name: 'expense_tracker'));
+    : super(executor ?? driftDatabase(name: 'ezhemesyachno'));
 
   @override
   int get schemaVersion => 1;
@@ -48,13 +58,14 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _seedCategories() async {
     const defaults = <(String, int)>[
-      ('Продукты', 0xFF4CAF50),
-      ('Транспорт', 0xFF2196F3),
-      ('Дом и ЖКХ', 0xFF795548),
-      ('Здоровье', 0xFFE91E63),
-      ('Развлечения', 0xFF9C27B0),
-      ('Подписки', 0xFFFF9800),
-      ('Прочее', 0xFF607D8B),
+      ('ЖКХ', 0xFF795548),
+      ('Кредиты и ипотека', 0xFFE53935),
+      ('Рассрочки', 0xFFFB8C00),
+      ('Подписки', 0xFF8E24AA),
+      ('Связь и интернет', 0xFF1E88E5),
+      ('Налоги и штрафы', 0xFF546E7A),
+      ('Страховка', 0xFF43A047),
+      ('Прочее', 0xFF757575),
     ];
     await batch((b) {
       b.insertAll(categories, [
