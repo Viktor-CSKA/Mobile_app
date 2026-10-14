@@ -1,0 +1,21 @@
+# Obsidian: личное состояние окон не коммитим
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+.trash/
+
+# Секреты и ключи подписи — никогда в репозиторий
+*.jks
+*.keystore
+key.properties
+*.pem
+.env
+
+# Логи сборки
+*.log
+
+# ОС / редакторы
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
