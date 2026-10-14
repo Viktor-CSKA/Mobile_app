@@ -336,6 +336,17 @@ class $PaymentsTable extends Payments with TableInfo<$PaymentsTable, Payment> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _anchorDayMeta = const VerificationMeta(
+    'anchorDay',
+  );
+  @override
+  late final GeneratedColumn<int> anchorDay = GeneratedColumn<int>(
+    'anchor_day',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _remindDaysBeforeMeta = const VerificationMeta(
     'remindDaysBefore',
   );
@@ -390,6 +401,7 @@ class $PaymentsTable extends Payments with TableInfo<$PaymentsTable, Payment> {
     amountKopecks,
     periodMonths,
     nextDueAt,
+    anchorDay,
     remindDaysBefore,
     endsAt,
     note,
@@ -452,6 +464,14 @@ class $PaymentsTable extends Payments with TableInfo<$PaymentsTable, Payment> {
     } else if (isInserting) {
       context.missing(_nextDueAtMeta);
     }
+    if (data.containsKey('anchor_day')) {
+      context.handle(
+        _anchorDayMeta,
+        anchorDay.isAcceptableOrUnknown(data['anchor_day']!, _anchorDayMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_anchorDayMeta);
+    }
     if (data.containsKey('remind_days_before')) {
       context.handle(
         _remindDaysBeforeMeta,
@@ -512,6 +532,10 @@ class $PaymentsTable extends Payments with TableInfo<$PaymentsTable, Payment> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}next_due_at'],
       )!,
+      anchorDay: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}anchor_day'],
+      )!,
       remindDaysBefore: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}remind_days_before'],
@@ -548,6 +572,10 @@ class Payment extends DataClass implements Insertable<Payment> {
   /// Период повтора в месяцах: 1 — ежемесячно, 3 — раз в квартал, 12 — раз в год.
   final int periodMonths;
   final DateTime nextDueAt;
+
+  /// Исходный день месяца (1..31). Нужен, чтобы платёж «31-го» после февраля
+  /// возвращался на 31-е, а не оставался на 28-м.
+  final int anchorDay;
   final int remindDaysBefore;
 
   /// Дата окончания (кредит, рассрочка); null — бессрочно (подписка).
@@ -561,6 +589,7 @@ class Payment extends DataClass implements Insertable<Payment> {
     this.amountKopecks,
     required this.periodMonths,
     required this.nextDueAt,
+    required this.anchorDay,
     required this.remindDaysBefore,
     this.endsAt,
     required this.note,
@@ -577,6 +606,7 @@ class Payment extends DataClass implements Insertable<Payment> {
     }
     map['period_months'] = Variable<int>(periodMonths);
     map['next_due_at'] = Variable<DateTime>(nextDueAt);
+    map['anchor_day'] = Variable<int>(anchorDay);
     map['remind_days_before'] = Variable<int>(remindDaysBefore);
     if (!nullToAbsent || endsAt != null) {
       map['ends_at'] = Variable<DateTime>(endsAt);
@@ -596,6 +626,7 @@ class Payment extends DataClass implements Insertable<Payment> {
           : Value(amountKopecks),
       periodMonths: Value(periodMonths),
       nextDueAt: Value(nextDueAt),
+      anchorDay: Value(anchorDay),
       remindDaysBefore: Value(remindDaysBefore),
       endsAt: endsAt == null && nullToAbsent
           ? const Value.absent()
@@ -617,6 +648,7 @@ class Payment extends DataClass implements Insertable<Payment> {
       amountKopecks: serializer.fromJson<int?>(json['amountKopecks']),
       periodMonths: serializer.fromJson<int>(json['periodMonths']),
       nextDueAt: serializer.fromJson<DateTime>(json['nextDueAt']),
+      anchorDay: serializer.fromJson<int>(json['anchorDay']),
       remindDaysBefore: serializer.fromJson<int>(json['remindDaysBefore']),
       endsAt: serializer.fromJson<DateTime?>(json['endsAt']),
       note: serializer.fromJson<String>(json['note']),
@@ -633,6 +665,7 @@ class Payment extends DataClass implements Insertable<Payment> {
       'amountKopecks': serializer.toJson<int?>(amountKopecks),
       'periodMonths': serializer.toJson<int>(periodMonths),
       'nextDueAt': serializer.toJson<DateTime>(nextDueAt),
+      'anchorDay': serializer.toJson<int>(anchorDay),
       'remindDaysBefore': serializer.toJson<int>(remindDaysBefore),
       'endsAt': serializer.toJson<DateTime?>(endsAt),
       'note': serializer.toJson<String>(note),
@@ -647,6 +680,7 @@ class Payment extends DataClass implements Insertable<Payment> {
     Value<int?> amountKopecks = const Value.absent(),
     int? periodMonths,
     DateTime? nextDueAt,
+    int? anchorDay,
     int? remindDaysBefore,
     Value<DateTime?> endsAt = const Value.absent(),
     String? note,
@@ -660,6 +694,7 @@ class Payment extends DataClass implements Insertable<Payment> {
         : this.amountKopecks,
     periodMonths: periodMonths ?? this.periodMonths,
     nextDueAt: nextDueAt ?? this.nextDueAt,
+    anchorDay: anchorDay ?? this.anchorDay,
     remindDaysBefore: remindDaysBefore ?? this.remindDaysBefore,
     endsAt: endsAt.present ? endsAt.value : this.endsAt,
     note: note ?? this.note,
@@ -679,6 +714,7 @@ class Payment extends DataClass implements Insertable<Payment> {
           ? data.periodMonths.value
           : this.periodMonths,
       nextDueAt: data.nextDueAt.present ? data.nextDueAt.value : this.nextDueAt,
+      anchorDay: data.anchorDay.present ? data.anchorDay.value : this.anchorDay,
       remindDaysBefore: data.remindDaysBefore.present
           ? data.remindDaysBefore.value
           : this.remindDaysBefore,
@@ -697,6 +733,7 @@ class Payment extends DataClass implements Insertable<Payment> {
           ..write('amountKopecks: $amountKopecks, ')
           ..write('periodMonths: $periodMonths, ')
           ..write('nextDueAt: $nextDueAt, ')
+          ..write('anchorDay: $anchorDay, ')
           ..write('remindDaysBefore: $remindDaysBefore, ')
           ..write('endsAt: $endsAt, ')
           ..write('note: $note, ')
@@ -713,6 +750,7 @@ class Payment extends DataClass implements Insertable<Payment> {
     amountKopecks,
     periodMonths,
     nextDueAt,
+    anchorDay,
     remindDaysBefore,
     endsAt,
     note,
@@ -728,6 +766,7 @@ class Payment extends DataClass implements Insertable<Payment> {
           other.amountKopecks == this.amountKopecks &&
           other.periodMonths == this.periodMonths &&
           other.nextDueAt == this.nextDueAt &&
+          other.anchorDay == this.anchorDay &&
           other.remindDaysBefore == this.remindDaysBefore &&
           other.endsAt == this.endsAt &&
           other.note == this.note &&
@@ -741,6 +780,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
   final Value<int?> amountKopecks;
   final Value<int> periodMonths;
   final Value<DateTime> nextDueAt;
+  final Value<int> anchorDay;
   final Value<int> remindDaysBefore;
   final Value<DateTime?> endsAt;
   final Value<String> note;
@@ -752,6 +792,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     this.amountKopecks = const Value.absent(),
     this.periodMonths = const Value.absent(),
     this.nextDueAt = const Value.absent(),
+    this.anchorDay = const Value.absent(),
     this.remindDaysBefore = const Value.absent(),
     this.endsAt = const Value.absent(),
     this.note = const Value.absent(),
@@ -764,13 +805,15 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     this.amountKopecks = const Value.absent(),
     this.periodMonths = const Value.absent(),
     required DateTime nextDueAt,
+    required int anchorDay,
     this.remindDaysBefore = const Value.absent(),
     this.endsAt = const Value.absent(),
     this.note = const Value.absent(),
     this.isActive = const Value.absent(),
   }) : name = Value(name),
        categoryId = Value(categoryId),
-       nextDueAt = Value(nextDueAt);
+       nextDueAt = Value(nextDueAt),
+       anchorDay = Value(anchorDay);
   static Insertable<Payment> custom({
     Expression<int>? id,
     Expression<String>? name,
@@ -778,6 +821,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     Expression<int>? amountKopecks,
     Expression<int>? periodMonths,
     Expression<DateTime>? nextDueAt,
+    Expression<int>? anchorDay,
     Expression<int>? remindDaysBefore,
     Expression<DateTime>? endsAt,
     Expression<String>? note,
@@ -790,6 +834,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
       if (amountKopecks != null) 'amount_kopecks': amountKopecks,
       if (periodMonths != null) 'period_months': periodMonths,
       if (nextDueAt != null) 'next_due_at': nextDueAt,
+      if (anchorDay != null) 'anchor_day': anchorDay,
       if (remindDaysBefore != null) 'remind_days_before': remindDaysBefore,
       if (endsAt != null) 'ends_at': endsAt,
       if (note != null) 'note': note,
@@ -804,6 +849,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     Value<int?>? amountKopecks,
     Value<int>? periodMonths,
     Value<DateTime>? nextDueAt,
+    Value<int>? anchorDay,
     Value<int>? remindDaysBefore,
     Value<DateTime?>? endsAt,
     Value<String>? note,
@@ -816,6 +862,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
       amountKopecks: amountKopecks ?? this.amountKopecks,
       periodMonths: periodMonths ?? this.periodMonths,
       nextDueAt: nextDueAt ?? this.nextDueAt,
+      anchorDay: anchorDay ?? this.anchorDay,
       remindDaysBefore: remindDaysBefore ?? this.remindDaysBefore,
       endsAt: endsAt ?? this.endsAt,
       note: note ?? this.note,
@@ -844,6 +891,9 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     if (nextDueAt.present) {
       map['next_due_at'] = Variable<DateTime>(nextDueAt.value);
     }
+    if (anchorDay.present) {
+      map['anchor_day'] = Variable<int>(anchorDay.value);
+    }
     if (remindDaysBefore.present) {
       map['remind_days_before'] = Variable<int>(remindDaysBefore.value);
     }
@@ -868,6 +918,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
           ..write('amountKopecks: $amountKopecks, ')
           ..write('periodMonths: $periodMonths, ')
           ..write('nextDueAt: $nextDueAt, ')
+          ..write('anchorDay: $anchorDay, ')
           ..write('remindDaysBefore: $remindDaysBefore, ')
           ..write('endsAt: $endsAt, ')
           ..write('note: $note, ')
@@ -1460,6 +1511,7 @@ typedef $$PaymentsTableCreateCompanionBuilder = PaymentsCompanion Function({
   Value<int?> amountKopecks,
   Value<int> periodMonths,
   required DateTime nextDueAt,
+  required int anchorDay,
   Value<int> remindDaysBefore,
   Value<DateTime?> endsAt,
   Value<String> note,
@@ -1472,6 +1524,7 @@ typedef $$PaymentsTableUpdateCompanionBuilder = PaymentsCompanion Function({
   Value<int?> amountKopecks,
   Value<int> periodMonths,
   Value<DateTime> nextDueAt,
+  Value<int> anchorDay,
   Value<int> remindDaysBefore,
   Value<DateTime?> endsAt,
   Value<String> note,
@@ -1549,6 +1602,11 @@ class $$PaymentsTableFilterComposer
 
   ColumnFilters<DateTime> get nextDueAt => $composableBuilder(
     column: $table.nextDueAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get anchorDay => $composableBuilder(
+    column: $table.anchorDay,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1655,6 +1713,11 @@ class $$PaymentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get anchorDay => $composableBuilder(
+    column: $table.anchorDay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get remindDaysBefore => $composableBuilder(
     column: $table.remindDaysBefore,
     builder: (column) => ColumnOrderings(column),
@@ -1726,6 +1789,9 @@ class $$PaymentsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get nextDueAt =>
       $composableBuilder(column: $table.nextDueAt, builder: (column) => column);
+
+  GeneratedColumn<int> get anchorDay =>
+      $composableBuilder(column: $table.anchorDay, builder: (column) => column);
 
   GeneratedColumn<int> get remindDaysBefore => $composableBuilder(
     column: $table.remindDaysBefore,
@@ -1824,6 +1890,7 @@ class $$PaymentsTableTableManager
                 Value<int?> amountKopecks = const Value.absent(),
                 Value<int> periodMonths = const Value.absent(),
                 Value<DateTime> nextDueAt = const Value.absent(),
+                Value<int> anchorDay = const Value.absent(),
                 Value<int> remindDaysBefore = const Value.absent(),
                 Value<DateTime?> endsAt = const Value.absent(),
                 Value<String> note = const Value.absent(),
@@ -1835,6 +1902,7 @@ class $$PaymentsTableTableManager
                 amountKopecks: amountKopecks,
                 periodMonths: periodMonths,
                 nextDueAt: nextDueAt,
+                anchorDay: anchorDay,
                 remindDaysBefore: remindDaysBefore,
                 endsAt: endsAt,
                 note: note,
@@ -1848,6 +1916,7 @@ class $$PaymentsTableTableManager
                 Value<int?> amountKopecks = const Value.absent(),
                 Value<int> periodMonths = const Value.absent(),
                 required DateTime nextDueAt,
+                required int anchorDay,
                 Value<int> remindDaysBefore = const Value.absent(),
                 Value<DateTime?> endsAt = const Value.absent(),
                 Value<String> note = const Value.absent(),
@@ -1859,6 +1928,7 @@ class $$PaymentsTableTableManager
                 amountKopecks: amountKopecks,
                 periodMonths: periodMonths,
                 nextDueAt: nextDueAt,
+                anchorDay: anchorDay,
                 remindDaysBefore: remindDaysBefore,
                 endsAt: endsAt,
                 note: note,

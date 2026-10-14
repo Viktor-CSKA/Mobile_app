@@ -22,6 +22,10 @@ class Payments extends Table {
   /// Период повтора в месяцах: 1 — ежемесячно, 3 — раз в квартал, 12 — раз в год.
   IntColumn get periodMonths => integer().withDefault(const Constant(1))();
   DateTimeColumn get nextDueAt => dateTime()();
+
+  /// Исходный день месяца (1..31). Нужен, чтобы платёж «31-го» после февраля
+  /// возвращался на 31-е, а не оставался на 28-м.
+  IntColumn get anchorDay => integer()();
   IntColumn get remindDaysBefore => integer().withDefault(const Constant(1))();
 
   /// Дата окончания (кредит, рассрочка); null — бессрочно (подписка).
