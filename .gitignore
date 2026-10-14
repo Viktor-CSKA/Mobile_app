@@ -11,6 +11,9 @@ key.properties
 *.pem
 .env
 
+# Кэш пакетов Dart (нужен рядом с проектом, см. CLAUDE.md)
+.pub-cache/
+
 # Логи сборки
 *.log
 

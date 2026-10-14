@@ -19,6 +19,7 @@
 ## Разработка
 - Flutter в `C:\dev\flutter\bin` (если `flutter` не найден — использовать полный путь).
 - **Кириллица в пути ломает Dart/Gradle** (`приложуха`): `build_runner`, `flutter build` запускать через диск `P:` (`subst P: "C:\Users\CENTICORE\Desktop\приложуха"`, потом `cd P:\app`). После перезагрузки ПК `subst` нужно повторить.
+- **Сборка APK** — только в терминальной панели (в песочнице Gradle падает на loopback), одной строкой: `$env:PUB_CACHE = 'P:\.pub-cache'; Set-Location P:\app; flutter build apk --debug -v > P:\build.log 2>&1`. `PUB_CACHE` должен быть на `P:` (иначе компилятор Dart не читает пакеты с `C:`). PowerShell-скрипты `.ps1` запрещены политикой выполнения, не создавать.
 - Генерация кода Drift: `dart run build_runner build --delete-conflicting-outputs` (из `P:\app`).
 - Деньги хранить в копейках (`int`), не в `double`.
 - Перед завершением задачи: `dart format`, `flutter analyze`, `flutter test`.
