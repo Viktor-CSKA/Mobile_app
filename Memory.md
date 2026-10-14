@@ -25,7 +25,7 @@
 - Установлены: Flutter, JDK 17, Android SDK (`C:\Android\Sdk`, platform 36, build-tools 37.0.0; `ANDROID_HOME` задан). `flutter doctor`: всё ✓, кроме Visual Studio (для Windows-приложений, не нужен).
 - Предложены к установке плагины «Dart and Flutter» и «Mobile Release Check» (включает пользователь).
 - Фаза 1 готова: каркас Flutter в `app/` (org `ru.example` — временный), Riverpod 3 + Drift (схема v1), тема M3, 4 экрана-заглушки, `flutter analyze` и `flutter test` зелёные. Локальный git, коммит `d8ff18a`, ветка `main`.
-- GitHub: пользователь дал `https://github.com/Viktor-CSKA` (это профиль). Публичные репозитории: `Tests`, `-yandex_praktikum_DS`; репозитория под приложение пока нет. Remote не подключён, ничего не отправлено.
+- GitHub: `https://github.com/Viktor-CSKA/Mobile_app.git` (создан пользователем), `origin` подключён, ветка `main` отправлена (2026-10-14, коммит `9533bd3`). Вход в GitHub идёт через Git Credential Manager в браузере: `git push` запускать в терминальной панели (в песочнице нет учётных данных). Отправлять в GitHub только по просьбе пользователя.
 - **Debug-APK собран** (2026-10-14, `app/build/app/outputs/flutter-apk/app-debug.apk`, 160 МБ). На телефоне и эмуляторе не проверялся.
 - Особенности среды (команды в CLAUDE.md): кириллица в пути ломает Dart/Gradle → `subst P:`; кэш пакетов `PUB_CACHE=P:\.pub-cache`; Gradle собирается только в терминальной панели (песочница блокирует loopback); политика PowerShell запрещает `.ps1`.
 
@@ -34,7 +34,6 @@
 - [ ] Фаза 0: проверить конкурентов в поиске RuStore, выбрать название
 - [ ] Решить вопрос с ИП (нужен для Premium)
 - [ ] Проверить debug-APK на телефоне (USB-отладка) или эмуляторе
-- [ ] Назвать репозиторий GitHub под приложение и подключить remote
 
 ## 6. Предпочтения пользователя
 - Общение на русском. Просит действовать самостоятельно как опытный разработчик/аналитик, экономить токены.
