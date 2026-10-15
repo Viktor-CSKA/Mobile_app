@@ -3,12 +3,14 @@ import 'package:ezhemesyachno/app.dart';
 import 'package:ezhemesyachno/core/clock.dart';
 import 'package:ezhemesyachno/core/database/app_database.dart';
 import 'package:ezhemesyachno/core/database/database_provider.dart';
+import 'package:ezhemesyachno/features/backup/data/backup_providers.dart';
 import 'package:ezhemesyachno/features/reminders/data/reminder_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'fake_file_gateway.dart';
 import 'fake_scheduler.dart';
 
 /// Виджет-тест приложения с базой в памяти (вместо файла на устройстве).
@@ -28,6 +30,7 @@ void appTest(
   DateTime? now,
   Future<void> Function(AppDatabase db)? seed,
   FakeNotificationScheduler? scheduler,
+  FakeFileGateway? files,
   Map<String, Object> prefs = const {},
 }) {
   testWidgets(description, (tester) async {
@@ -61,6 +64,7 @@ void appTest(
           notificationSchedulerProvider.overrideWithValue(
             scheduler ?? FakeNotificationScheduler(),
           ),
+          fileGatewayProvider.overrideWithValue(files ?? FakeFileGateway()),
           if (today != null) todayProvider.overrideWithValue(today),
           if (fakeNow != null) nowProvider.overrideWithValue(fakeNow),
         ],

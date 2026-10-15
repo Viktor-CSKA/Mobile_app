@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/format/plural_ru.dart';
+import '../../backup/data/backup_providers.dart';
+import '../../backup/data/data_transfer_service.dart';
 import '../../reminders/data/reminder_providers.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -55,6 +58,70 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   Future<void> _allowExact() async {
     await ref.read(notificationSchedulerProvider).requestExactAlarms();
     ref.invalidate(notificationStatusProvider);
+  }
+
+  void _say(String text) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  /// Выполняет экспорт и сообщает итог. Отказ пользователя ничего не показывает.
+  Future<void> _transfer(
+    Future<TransferResult> Function(DataTransferService service) action, {
+    required String savedText,
+  }) async {
+    final result = await action(ref.read(dataTransferServiceProvider));
+    if (!mounted) return;
+    switch (result.status) {
+      case TransferStatus.saved:
+        _say(savedText);
+      case TransferStatus.failed:
+        _say(result.message ?? 'Не удалось выполнить операцию');
+      case TransferStatus.cancelled || TransferStatus.restored:
+        break;
+    }
+  }
+
+  Future<void> _restore() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Восстановить из копии?'),
+        content: const Text(
+          'Все текущие платежи и история оплат будут заменены данными из '
+          'выбранного файла. Это действие нельзя отменить: при необходимости '
+          'сначала сохраните резервную копию.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Выбрать файл'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final result = await ref
+        .read(dataTransferServiceProvider)
+        .restoreFromFile();
+    if (!mounted) return;
+    switch (result.status) {
+      case TransferStatus.restored:
+        _say(
+          'Восстановлено: ${paymentsCountLabel(result.payments)}, '
+          '${result.records} ${pluralRu(result.records, 'оплата', 'оплаты', 'оплат')}',
+        );
+      case TransferStatus.failed:
+        _say('Файл не подошёл: ${result.message ?? 'неизвестная ошибка'}');
+      case TransferStatus.cancelled || TransferStatus.saved:
+        break;
+    }
   }
 
   Future<void> _sendTest() async {
@@ -133,9 +200,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             onTap: _sendTest,
           ),
           const Divider(),
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Здесь будут экспорт и резервная копия'),
+          const _SectionTitle('Данные'),
+          ListTile(
+            leading: const Icon(Icons.save_alt),
+            title: const Text('Сохранить резервную копию'),
+            subtitle: const Text('Файл со всеми платежами и историей оплат'),
+            onTap: () => _transfer(
+              (s) => s.exportBackup(),
+              savedText: 'Резервная копия сохранена',
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.restore),
+            title: const Text('Восстановить из копии'),
+            subtitle: const Text('Заменит текущие данные содержимым файла'),
+            onTap: _restore,
+          ),
+          ListTile(
+            leading: const Icon(Icons.table_chart_outlined),
+            title: const Text('Экспорт платежей (CSV)'),
+            subtitle: const Text('Таблица для Excel'),
+            onTap: () => _transfer(
+              (s) => s.exportPaymentsCsv(),
+              savedText: 'Таблица платежей сохранена',
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.history),
+            title: const Text('Экспорт истории оплат (CSV)'),
+            subtitle: const Text('Все отметки «Оплачено»'),
+            onTap: () => _transfer(
+              (s) => s.exportHistoryCsv(),
+              savedText: 'История оплат сохранена',
+            ),
           ),
         ],
       ),

@@ -15,6 +15,6 @@ void main() {
     expect(find.text('Добавить платёж'), findsOneWidget);
 
     await openTab(tester, 'Настройки');
-    expect(find.text('Здесь будут экспорт и резервная копия'), findsOneWidget);
+    expect(find.text('Сохранить резервную копию'), findsOneWidget);
   });
 }

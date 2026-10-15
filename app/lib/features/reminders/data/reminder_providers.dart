@@ -54,6 +54,9 @@ final reminderSyncProvider = Provider<void>((ref) {
   void run() {
     final payments = ref.read(activePaymentsProvider).value;
     if (payments == null) return;
+    // «Сейчас» читается заново: приложение могло долго быть открытым, и
+    // закэшированное время дало бы напоминания «в прошлом».
+    ref.invalidate(nowProvider);
     ref
         .read(reminderServiceProvider)
         .sync(
