@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/clock.dart';
+import '../../../core/database/app_database.dart';
 import '../../../core/format/date_format_ru.dart';
 import '../../../core/format/money.dart';
 import '../../reminders/data/reminder_providers.dart';
 import '../data/payments_providers.dart';
 import '../domain/payment_draft.dart';
 import '../domain/payment_schedule.dart';
+import '../domain/payment_templates.dart';
 import 'payment_labels.dart';
+import 'template_picker.dart';
 
 /// Экран добавления (когда [paymentId] == null) или редактирования платежа.
 class PaymentFormScreen extends ConsumerStatefulWidget {
@@ -24,6 +28,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
   final _name = TextEditingController();
   final _amount = TextEditingController();
   final _note = TextEditingController();
+  final _amountFocus = FocusNode();
 
   int? _categoryId;
   bool _variableAmount = false;
@@ -39,6 +44,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
   @override
   void initState() {
     super.initState();
+    _nextDue = dateOnly(ref.read(todayProvider));
     if (_isEdit) {
       _loading = true;
       _load();
@@ -75,7 +81,38 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
     _name.dispose();
     _amount.dispose();
     _note.dispose();
+    _amountFocus.dispose();
     super.dispose();
+  }
+
+  /// Заполняет форму шаблоном. Сумму не трогаем, кроме переменной (её
+  /// очищаем); для платежа с постоянной суммой переводим фокус на «Сумма».
+  void _applyTemplate(PaymentTemplate t, List<Category> categories) {
+    final categoryId = categoryIdFor(t, [
+      for (final c in categories) (id: c.id, name: c.name),
+    ]);
+    final due = suggestedDue(t, ref.read(todayProvider));
+    setState(() {
+      _name.text = t.name;
+      if (categoryId != null) _categoryId = categoryId;
+      _periodMonths = t.periodMonths;
+      _remindDays = t.remindDaysBefore;
+      _variableAmount = t.variableAmount;
+      if (t.variableAmount) _amount.clear();
+      if (due != null) _nextDue = due;
+    });
+    if (!t.variableAmount) {
+      // Поле суммы могло только что появиться (если было «сумма меняется»),
+      // поэтому фокус просим после перестроения.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _amountFocus.requestFocus();
+      });
+    }
+  }
+
+  Future<void> _pickTemplate(List<Category> categories) async {
+    final t = await showTemplatePicker(context);
+    if (t != null && mounted) _applyTemplate(t, categories);
   }
 
   Future<DateTime?> _pickDate(DateTime initial, {DateTime? first}) {
@@ -191,6 +228,35 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (!_isEdit) ...[
+                      Text(
+                        'Быстрый выбор',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      // Одна прокручиваемая строка вместо нескольких: форма
+                      // остаётся короткой. «Все шаблоны» стоит первым.
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            ActionChip(
+                              avatar: const Icon(Icons.list, size: 18),
+                              label: const Text('Все шаблоны'),
+                              onPressed: () => _pickTemplate(categories),
+                            ),
+                            for (final t in popularTemplates) ...[
+                              const SizedBox(width: 8),
+                              ActionChip(
+                                label: Text(t.name),
+                                onPressed: () => _applyTemplate(t, categories),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     TextFormField(
                       controller: _name,
                       textCapitalization: TextCapitalization.sentences,
@@ -232,6 +298,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                     if (!_variableAmount)
                       TextFormField(
                         controller: _amount,
+                        focusNode: _amountFocus,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
@@ -315,12 +382,19 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _saving ? null : _save,
-                      child: const Text('Сохранить'),
-                    ),
                   ],
+                ),
+              ),
+            ),
+      // Кнопка закреплена внизу: форма длинная, и её не нужно искать прокруткой.
+      bottomNavigationBar: _loading
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: FilledButton(
+                  onPressed: _saving ? null : _save,
+                  child: const Text('Сохранить'),
                 ),
               ),
             ),
