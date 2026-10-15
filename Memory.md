@@ -29,12 +29,12 @@
 
 ## 4. Текущее состояние
 - Фаза 1 готова, фаза 0 закрыта. Каркас в `app/`: `flutter analyze` и `flutter test` зелёные.
-- Debug-APK пересобран под `app.ezhemesyachno` (160 МБ, aapt: пакет `app.ezhemesyachno`, название «Ежемесячно»). На телефоне/эмуляторе не запускался.
+- Debug-APK пересобран 2026-10-15 после вкладок «Платежи» и «Ближайшие» (174 МБ, пакет `app.ezhemesyachno`, название «Ежемесячно»): `app/build/app/outputs/flutter-apk/app-debug.apk`. Пользователю передан на проверку на телефоне; результат проверки пока неизвестен. `adb devices` пуст (телефон к ПК не подключён).
+- В GitHub отправлено всё до коммита `e78459c` включительно.
 - GitHub: `https://github.com/Viktor-CSKA/Mobile_app.git`, `origin` подключён. Вход через Git Credential Manager в браузере: `git push` запускать в терминальной панели. Отправлять в GitHub только по просьбе пользователя.
 - Слои платежей: `domain/` (расписание, `PaymentDraft`), `data/` (репозиторий, провайдеры Riverpod), `presentation/` (список, форма). Приложение на русской локали (`flutter_localizations`). Деньги: `core/format/money.dart`, даты: `core/format/date_format_ru.dart`.
 - «Ближайшие»: `features/upcoming/` (`domain/upcoming_summary.dart`, экран, диалог `pay_dialog.dart`). «Сегодня» берётся из `todayProvider` (`core/clock.dart`), в тестах подменяется. Прогноз: `forecastOutstanding` (просрочка считается один раз). `markPaid` возвращает новую дату или `null`.
 - Тесты: виджет-тесты через `appTest` (`test/helpers/test_app.dart`: база в памяти, высокий экран, `today:` и `seed:` — данные класть через `seed:` ДО запуска экранов, иначе запросы из `runAsync` зависают; снятие дерева в конце — иначе висит таймер Drift). Запуск зависших тестов: из Start-Process с ограничением по времени, не через `| Select-Object -First`.
-- После правок UI APK не пересобирался (проверено только `flutter analyze` и тесты).
 - Особенности среды (команды в CLAUDE.md): кириллица в пути → `subst P:`; `PUB_CACHE=P:\.pub-cache`; Gradle собирается только в терминальной панели (песочница блокирует loopback); политика PowerShell запрещает `.ps1`; терминальных вкладок не больше 6.
 
 ## 5. Следующие шаги (фаза 2, MVP)
