@@ -196,6 +196,59 @@ void main() {
     });
   });
 
+  group('watchPaidBetween', () {
+    test('возвращает оплаты периода с платежом и категорией', () async {
+      final id = await repo.add(
+        draft(name: 'Вода', due: DateTime(2026, 10, 12)),
+      );
+      await repo.markPaid(id, paidAt: DateTime(2026, 10, 12, 19, 5));
+
+      final list = await repo
+          .watchPaidBetween(DateTime(2026, 10), DateTime(2026, 10, 31))
+          .first;
+      expect(list.length, 1);
+      expect(list.single.payment.name, 'Вода');
+      expect(list.single.category.id, categoryId);
+      expect(list.single.record.amountKopecks, 69000);
+    });
+
+    test('границы периода включаются по дню, время не важно', () async {
+      final id = await repo.add(draft());
+      await repo.markPaid(id, paidAt: DateTime(2026, 10, 1, 0, 0));
+      await repo.markPaid(id, paidAt: DateTime(2026, 10, 31, 23, 59));
+      await repo.markPaid(id, paidAt: DateTime(2026, 9, 30, 23, 59));
+      await repo.markPaid(id, paidAt: DateTime(2026, 11, 1, 0, 0));
+
+      final list = await repo
+          .watchPaidBetween(DateTime(2026, 10), DateTime(2026, 10, 31))
+          .first;
+      expect(list.map((e) => e.record.paidAt.day), [1, 31]);
+    });
+
+    test('включает оплаты по закрытым платежам', () async {
+      final id = await repo.add(
+        draft(due: DateTime(2026, 10, 10), ends: DateTime(2026, 10, 10)),
+      );
+      await repo.markPaid(id, paidAt: DateTime(2026, 10, 10));
+      expect(await repo.watchActive().first, isEmpty);
+
+      final list = await repo
+          .watchPaidBetween(DateTime(2026, 10), DateTime(2026, 10, 31))
+          .first;
+      expect(list.length, 1);
+    });
+
+    test('пусто, если оплат не было', () async {
+      await repo.add(draft());
+      expect(
+        await repo
+            .watchPaidBetween(DateTime(2026, 10), DateTime(2026, 10, 31))
+            .first,
+        isEmpty,
+      );
+    });
+  });
+
   test('delete удаляет платёж и его историю', () async {
     final id = await repo.add(draft());
     await repo.markPaid(id);

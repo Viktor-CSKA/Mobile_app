@@ -36,6 +36,15 @@ class PaymentWithCategory {
   PaymentSchedule get schedule => payment.schedule;
 }
 
+/// Оплата из истории вместе с платежом и его категорией.
+class PaidEntry {
+  const PaidEntry(this.record, this.payment, this.category);
+
+  final PaymentRecord record;
+  final Payment payment;
+  final Category category;
+}
+
 extension PaymentScheduleX on Payment {
   PaymentSchedule get schedule => PaymentSchedule(
     nextDueAt: nextDueAt,

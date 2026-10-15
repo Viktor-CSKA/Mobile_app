@@ -5,6 +5,14 @@ DateTime dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
 int daysInMonth(int year, int month) => DateTime(year, month + 1, 0).day;
 
+/// Календарных дней от [from] до [to] (отрицательно, если [to] раньше).
+/// Не зависит от перехода на летнее/зимнее время.
+int daysBetween(DateTime from, DateTime to) {
+  final a = DateTime.utc(from.year, from.month, from.day);
+  final b = DateTime.utc(to.year, to.month, to.day);
+  return b.difference(a).inDays;
+}
+
 /// Дата платежа в месяце [year]-[month] с днём [anchorDay]; если в месяце
 /// меньше дней (31-е в феврале), берётся последний день месяца.
 DateTime dueDateInMonth(int year, int month, int anchorDay) {
@@ -57,11 +65,7 @@ class PaymentSchedule {
   bool isOverdue(DateTime today) => _due.isBefore(dateOnly(today));
 
   /// Дней до платежа; отрицательное число — просрочка.
-  int daysUntilDue(DateTime today) {
-    final a = DateTime.utc(_due.year, _due.month, _due.day);
-    final t = dateOnly(today);
-    return a.difference(DateTime.utc(t.year, t.month, t.day)).inDays;
-  }
+  int daysUntilDue(DateTime today) => daysBetween(today, _due);
 
   /// День, когда нужно показать напоминание.
   DateTime remindOn(int remindDaysBefore) =>

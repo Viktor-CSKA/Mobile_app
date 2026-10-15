@@ -28,6 +28,28 @@ const _monthsGenitive = [
   'декабря',
 ];
 
+const _monthsNominative = [
+  'Январь',
+  'Февраль',
+  'Март',
+  'Апрель',
+  'Май',
+  'Июнь',
+  'Июль',
+  'Август',
+  'Сентябрь',
+  'Октябрь',
+  'Ноябрь',
+  'Декабрь',
+];
+
+/// Заголовок месяца: `2026-10-05` → `Октябрь 2026`.
+String formatMonthYear(DateTime d) =>
+    '${_monthsNominative[d.month - 1]} ${d.year}';
+
+/// Дни недели с понедельника.
+const weekdaysShortRu = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
 /// `2026-10-05` → `5 окт`.
 String formatDayMonthShort(DateTime d) =>
     '${d.day} ${_monthsShort[d.month - 1]}';

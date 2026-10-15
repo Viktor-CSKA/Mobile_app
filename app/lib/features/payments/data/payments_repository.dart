@@ -35,6 +35,40 @@ class PaymentsRepository {
     );
   }
 
+  /// Оплаты за период [from]..[to] включительно (по дню оплаты), в том числе
+  /// по уже закрытым платежам. Старые по дате — первыми.
+  Stream<List<PaidEntry>> watchPaidBetween(DateTime from, DateTime to) {
+    final start = dateOnly(from);
+    final end = dateOnly(to);
+    final endExclusive = DateTime(end.year, end.month, end.day + 1);
+    final query =
+        _db.select(_db.paymentRecords).join([
+            innerJoin(
+              _db.payments,
+              _db.payments.id.equalsExp(_db.paymentRecords.paymentId),
+            ),
+            innerJoin(
+              _db.categories,
+              _db.categories.id.equalsExp(_db.payments.categoryId),
+            ),
+          ])
+          ..where(
+            _db.paymentRecords.paidAt.isBiggerOrEqualValue(start) &
+                _db.paymentRecords.paidAt.isSmallerThanValue(endExclusive),
+          )
+          ..orderBy([OrderingTerm.asc(_db.paymentRecords.paidAt)]);
+    return query.watch().map(
+      (rows) => [
+        for (final row in rows)
+          PaidEntry(
+            row.readTable(_db.paymentRecords),
+            row.readTable(_db.payments),
+            row.readTable(_db.categories),
+          ),
+      ],
+    );
+  }
+
   Stream<List<Category>> watchCategories() {
     return (_db.select(
       _db.categories,
