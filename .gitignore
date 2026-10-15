@@ -22,3 +22,7 @@ key.properties
 Thumbs.db
 .idea/
 .vscode/
+
+# Готовые сборки (хранятся локально в store/)
+*.apk
+*.aab
