@@ -31,7 +31,7 @@
 - Фаза 1 готова, фаза 0 закрыта. Каркас в `app/`: `flutter analyze` и `flutter test` зелёные.
 - Debug-APK пересобран 2026-10-15 после вкладок «Платежи» и «Ближайшие» (174 МБ, пакет `app.ezhemesyachno`, название «Ежемесячно»): `app/build/app/outputs/flutter-apk/app-debug.apk`. Пользователю передан на проверку на телефоне; результат проверки пока неизвестен. `adb devices` пуст (телефон к ПК не подключён).
 - 2026-10-15: debug-APK с календарём и напоминаниями собран (191 МБ; aapt подтвердил POST_NOTIFICATIONS, RECEIVE_BOOT_COMPLETED, SCHEDULE_EXACT_ALARM и приёмники плагина). Пользователю на проверку ещё не передан.
-- В GitHub отправлено всё до коммита `e78459c` включительно; позже есть локальные коммиты.
+- В GitHub отправлено всё до коммита `3669a11` включительно (2026-10-15). APK с напоминаниями пользователь проверяет на телефоне.
 - GitHub: `https://github.com/Viktor-CSKA/Mobile_app.git`, `origin` подключён. Вход через Git Credential Manager в браузере: `git push` запускать в терминальной панели. Отправлять в GitHub только по просьбе пользователя.
 - Слои платежей: `domain/` (расписание, `PaymentDraft`), `data/` (репозиторий, провайдеры Riverpod), `presentation/` (список, форма). Приложение на русской локали (`flutter_localizations`). Деньги: `core/format/money.dart`, даты: `core/format/date_format_ru.dart`.
 - «Ближайшие»: `features/upcoming/` (`domain/upcoming_summary.dart`, экран, диалог `pay_dialog.dart`). «Сегодня» берётся из `todayProvider` (`core/clock.dart`), в тестах подменяется. Прогноз: `forecastOutstanding` (просрочка считается один раз). `markPaid` возвращает новую дату или `null`.
