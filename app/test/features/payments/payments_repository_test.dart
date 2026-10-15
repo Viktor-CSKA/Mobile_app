@@ -166,7 +166,7 @@ void main() {
 
     test('возвращает новую дату, а у последнего платежа — null', () async {
       final monthly = await repo.add(draft(due: DateTime(2026, 1, 31)));
-      expect(await repo.markPaid(monthly), DateTime(2026, 2, 28));
+      expect((await repo.markPaid(monthly)).nextDue, DateTime(2026, 2, 28));
 
       final last = await repo.add(
         draft(
@@ -175,7 +175,7 @@ void main() {
           ends: DateTime(2026, 11, 10),
         ),
       );
-      expect(await repo.markPaid(last), isNull);
+      expect((await repo.markPaid(last)).nextDue, isNull);
     });
 
     test('сумма в истории может отличаться от обычной', () async {
@@ -196,6 +196,102 @@ void main() {
     });
   });
 
+  group('undoPaid', () {
+    test('возвращает дату и убирает запись из истории', () async {
+      final id = await repo.add(draft(due: DateTime(2026, 10, 15)));
+      final paid = await repo.markPaid(id, paidAt: DateTime(2026, 10, 15, 9));
+      expect(paid.previousDue, DateTime(2026, 10, 15));
+      expect(paid.nextDue, DateTime(2026, 11, 15));
+      expect(paid.wasActive, isTrue);
+
+      expect(await repo.undoPaid(paid), isTrue);
+
+      expect((await repo.getById(id))!.nextDueAt, DateTime(2026, 10, 15));
+      expect(await repo.watchRecords(id).first, isEmpty);
+    });
+
+    test('последний платёж кредита: платёж снова активен', () async {
+      final id = await repo.add(
+        draft(
+          name: 'Рассрочка',
+          due: DateTime(2026, 11, 10),
+          ends: DateTime(2026, 11, 10),
+        ),
+      );
+      final paid = await repo.markPaid(id);
+      expect((await repo.getById(id))!.isActive, isFalse);
+      expect(paid.nextDue, isNull);
+
+      expect(await repo.undoPaid(paid), isTrue);
+
+      final p = (await repo.getById(id))!;
+      expect(p.isActive, isTrue);
+      expect(p.nextDueAt, DateTime(2026, 11, 10));
+      expect(await repo.watchActive().first, hasLength(1));
+    });
+
+    test('повторная отмена ничего не меняет', () async {
+      final id = await repo.add(draft(due: DateTime(2026, 10, 15)));
+      final paid = await repo.markPaid(id);
+      expect(await repo.undoPaid(paid), isTrue);
+      expect(await repo.undoPaid(paid), isFalse);
+      expect((await repo.getById(id))!.nextDueAt, DateTime(2026, 10, 15));
+    });
+
+    test('отмена последней оплаты не трогает предыдущие', () async {
+      final id = await repo.add(draft(due: DateTime(2026, 8, 20)));
+      await repo.markPaid(id, paidAt: DateTime(2026, 8, 20));
+      final second = await repo.markPaid(id, paidAt: DateTime(2026, 9, 20));
+
+      expect(await repo.undoPaid(second), isTrue);
+
+      expect((await repo.getById(id))!.nextDueAt, DateTime(2026, 9, 20));
+      final records = await repo.watchRecords(id).first;
+      expect(records.length, 1);
+      expect(records.single.paidAt, DateTime(2026, 8, 20));
+    });
+
+    test('нельзя отменить не последнюю оплату: дата уже ушла дальше', () async {
+      final id = await repo.add(draft(due: DateTime(2026, 8, 20)));
+      final first = await repo.markPaid(id, paidAt: DateTime(2026, 8, 20));
+      await repo.markPaid(id, paidAt: DateTime(2026, 9, 20));
+
+      expect(await repo.undoPaid(first), isFalse);
+
+      expect((await repo.getById(id))!.nextDueAt, DateTime(2026, 10, 20));
+      expect(await repo.watchRecords(id).first, hasLength(2));
+    });
+
+    test('платёж изменили после оплаты: отмена не затирает правки', () async {
+      final id = await repo.add(draft(due: DateTime(2026, 10, 15)));
+      final paid = await repo.markPaid(id);
+      await repo.update(id, draft(name: 'Другое', due: DateTime(2026, 12, 1)));
+
+      expect(await repo.undoPaid(paid), isFalse);
+
+      final p = (await repo.getById(id))!;
+      expect(p.name, 'Другое');
+      expect(p.nextDueAt, DateTime(2026, 12, 1));
+      expect(await repo.watchRecords(id).first, hasLength(1));
+    });
+
+    test('платёж удалён: отмена безопасна', () async {
+      final id = await repo.add(draft(due: DateTime(2026, 10, 15)));
+      final paid = await repo.markPaid(id);
+      await repo.delete(id);
+
+      expect(await repo.undoPaid(paid), isFalse);
+    });
+
+    test('сумма оплаты не влияет на возврат даты', () async {
+      final id = await repo.add(
+        draft(amount: null, due: DateTime(2026, 10, 15)),
+      );
+      final paid = await repo.markPaid(id, amountKopecks: 41250);
+      expect(await repo.undoPaid(paid), isTrue);
+      expect((await repo.getById(id))!.nextDueAt, DateTime(2026, 10, 15));
+    });
+  });
   group('watchPaidBetween', () {
     test('возвращает оплаты периода с платежом и категорией', () async {
       final id = await repo.add(

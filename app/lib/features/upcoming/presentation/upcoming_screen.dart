@@ -23,17 +23,43 @@ class UpcomingScreen extends ConsumerWidget {
   ) async {
     final amount = await showPayDialog(context, item);
     if (amount == null || !context.mounted) return;
-    final next = await ref
-        .read(paymentsRepositoryProvider)
-        .markPaid(item.payment.id, amountKopecks: amount);
+    final repo = ref.read(paymentsRepositoryProvider);
+    final result = await repo.markPaid(item.payment.id, amountKopecks: amount);
     if (!context.mounted) return;
     final name = item.payment.name;
+    final next = result.nextDue;
     final text = next == null
         ? '«$name» оплачен. Платёж завершён.'
         : '«$name» оплачен. Следующий: ${formatDayMonthShort(next)}.';
-    ScaffoldMessenger.of(context)
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(text)));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(text),
+          duration: const Duration(seconds: 8),
+          // Со кнопкой снэкбар по умолчанию не исчезает сам и закрывал бы
+          // содержимое экрана; отмена нужна только на несколько секунд.
+          persist: false,
+          action: SnackBarAction(
+            label: 'Отменить',
+            onPressed: () async {
+              final ok = await repo.undoPaid(result);
+              messenger
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ok
+                          ? 'Оплата «$name» отменена'
+                          : 'Отменить не получилось: платёж уже изменён',
+                    ),
+                  ),
+                );
+            },
+          ),
+        ),
+      );
   }
 
   void _edit(BuildContext context, int paymentId) {

@@ -5,6 +5,7 @@ import '../../../core/format/plural_ru.dart';
 import '../../backup/data/backup_providers.dart';
 import '../../backup/data/data_transfer_service.dart';
 import '../../reminders/data/reminder_providers.dart';
+import '../data/theme_providers.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -198,6 +199,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             title: const Text('Проверить уведомление'),
             subtitle: const Text('Придёт через 10 секунд'),
             onTap: _sendTest,
+          ),
+          const Divider(),
+          const _SectionTitle('Оформление'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SegmentedButton<ThemeMode>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: ThemeMode.system, label: Text('Система')),
+                ButtonSegment(value: ThemeMode.light, label: Text('Светлая')),
+                ButtonSegment(value: ThemeMode.dark, label: Text('Тёмная')),
+              ],
+              selected: {ref.watch(themeModeProvider)},
+              onSelectionChanged: (s) =>
+                  ref.read(themeModeProvider.notifier).set(s.first),
+            ),
           ),
           const Divider(),
           const _SectionTitle('Данные'),

@@ -141,8 +141,9 @@ class PaymentsRepository {
   /// Для платежа с переменной суммой [amountKopecks] обязателен.
   /// Сумма может отличаться от обычной (фактически оплачено).
   ///
-  /// Возвращает новую ближайшую дату или null, если платёж закончился.
-  Future<DateTime?> markPaid(int id, {int? amountKopecks, DateTime? paidAt}) {
+  /// Возвращает [PaidResult]: новую ближайшую дату (null, если платёж
+  /// закончился) и данные для отмены через [undoPaid].
+  Future<PaidResult> markPaid(int id, {int? amountKopecks, DateTime? paidAt}) {
     return _db.transaction(() async {
       final payment = await getById(id);
       if (payment == null) throw StateError('Платёж $id не найден');
@@ -152,7 +153,7 @@ class PaymentsRepository {
       }
       if (amount < 0) throw ArgumentError('Сумма не может быть отрицательной');
 
-      await _db
+      final recordId = await _db
           .into(_db.paymentRecords)
           .insert(
             PaymentRecordsCompanion.insert(
@@ -168,7 +169,45 @@ class PaymentsRepository {
             ? const PaymentsCompanion(isActive: Value(false))
             : PaymentsCompanion(nextDueAt: Value(next)),
       );
-      return next;
+      return PaidResult(
+        recordId: recordId,
+        paymentId: id,
+        previousDue: payment.nextDueAt,
+        wasActive: payment.isActive,
+        nextDue: next,
+      );
+    });
+  }
+
+  /// Отменяет оплату: удаляет запись из истории и возвращает платёж в
+  /// состояние до оплаты. Возвращает false и ничего не меняет, если запись уже
+  /// удалена или платёж с тех пор изменили (чтобы не затереть правки).
+  Future<bool> undoPaid(PaidResult paid) {
+    return _db.transaction(() async {
+      final record = await (_db.select(
+        _db.paymentRecords,
+      )..where((r) => r.id.equals(paid.recordId))).getSingleOrNull();
+      final payment = await getById(paid.paymentId);
+      if (record == null || payment == null) return false;
+
+      final unchanged =
+          payment.isActive == (paid.nextDue != null) &&
+          dateOnly(payment.nextDueAt) ==
+              dateOnly(paid.nextDue ?? paid.previousDue);
+      if (!unchanged) return false;
+
+      await (_db.delete(
+        _db.paymentRecords,
+      )..where((r) => r.id.equals(paid.recordId))).go();
+      await (_db.update(
+        _db.payments,
+      )..where((p) => p.id.equals(paid.paymentId))).write(
+        PaymentsCompanion(
+          nextDueAt: Value(paid.previousDue),
+          isActive: Value(paid.wasActive),
+        ),
+      );
+      return true;
     });
   }
 

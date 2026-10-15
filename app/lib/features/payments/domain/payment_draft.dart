@@ -36,6 +36,28 @@ class PaymentWithCategory {
   PaymentSchedule get schedule => payment.schedule;
 }
 
+/// Итог отметки «Оплачено»: новая дата и всё нужное, чтобы отменить оплату.
+class PaidResult {
+  const PaidResult({
+    required this.recordId,
+    required this.paymentId,
+    required this.previousDue,
+    required this.wasActive,
+    required this.nextDue,
+  });
+
+  /// Запись, добавленная в историю оплат.
+  final int recordId;
+  final int paymentId;
+
+  /// Состояние платежа до оплаты.
+  final DateTime previousDue;
+  final bool wasActive;
+
+  /// Новая ближайшая дата; null — платёж закончился.
+  final DateTime? nextDue;
+}
+
 /// Оплата из истории вместе с платежом и его категорией.
 class PaidEntry {
   const PaidEntry(this.record, this.payment, this.category);

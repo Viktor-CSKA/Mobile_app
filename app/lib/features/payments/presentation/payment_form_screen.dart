@@ -10,6 +10,7 @@ import '../data/payments_providers.dart';
 import '../domain/payment_draft.dart';
 import '../domain/payment_schedule.dart';
 import '../domain/payment_templates.dart';
+import 'payment_history.dart';
 import 'payment_labels.dart';
 import 'template_picker.dart';
 
@@ -382,6 +383,8 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
+                    if (_isEdit) PaymentHistory(paymentId: widget.paymentId!),
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/clock.dart';
 import 'core/theme/app_theme.dart';
 import 'features/reminders/data/reminder_providers.dart';
+import 'features/settings/data/theme_providers.dart';
 import 'home_shell.dart';
 
 class EzhemesyachnoApp extends ConsumerStatefulWidget {
@@ -48,7 +49,7 @@ class _EzhemesyachnoAppState extends ConsumerState<EzhemesyachnoApp>
       title: 'Ежемесячно',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: ref.watch(themeModeProvider),
       locale: const Locale('ru'),
       supportedLocales: const [Locale('ru')],
       localizationsDelegates: const [
