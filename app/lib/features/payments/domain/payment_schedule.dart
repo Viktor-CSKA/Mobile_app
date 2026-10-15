@@ -116,12 +116,53 @@ MonthForecast forecastForMonth(
   Iterable<({PaymentSchedule schedule, int? amountKopecks})> items,
   DateTime month,
 ) {
-  final from = DateTime(month.year, month.month);
-  final to = DateTime(
-    month.year,
-    month.month,
-    daysInMonth(month.year, month.month),
+  return _forecastBetween(
+    items,
+    DateTime(month.year, month.month),
+    DateTime(month.year, month.month, daysInMonth(month.year, month.month)),
   );
+}
+
+/// Сколько нужно заплатить, начиная с [today] и до [through] включительно.
+///
+/// Просроченный платёж считается один раз (как долг), даже если просрочен на
+/// несколько периодов: пропущенные ранее даты не накапливаются. Затем идут
+/// платежи с датой от [today] до [through].
+MonthForecast forecastOutstanding(
+  Iterable<({PaymentSchedule schedule, int? amountKopecks})> items,
+  DateTime today,
+  DateTime through,
+) {
+  var total = 0;
+  var variable = 0;
+  var count = 0;
+  void add(int? amount) {
+    count++;
+    if (amount == null) {
+      variable++;
+    } else {
+      total += amount;
+    }
+  }
+
+  for (final item in items) {
+    if (item.schedule.isOverdue(today)) add(item.amountKopecks);
+    for (final _ in item.schedule.occurrencesBetween(today, through)) {
+      add(item.amountKopecks);
+    }
+  }
+  return MonthForecast(
+    totalKopecks: total,
+    variableCount: variable,
+    paymentsCount: count,
+  );
+}
+
+MonthForecast _forecastBetween(
+  Iterable<({PaymentSchedule schedule, int? amountKopecks})> items,
+  DateTime from,
+  DateTime to,
+) {
   var total = 0;
   var variable = 0;
   var count = 0;

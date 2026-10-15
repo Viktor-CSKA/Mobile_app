@@ -164,6 +164,26 @@ void main() {
       expect((await repo.watchRecords(id).first).length, 1);
     });
 
+    test('возвращает новую дату, а у последнего платежа — null', () async {
+      final monthly = await repo.add(draft(due: DateTime(2026, 1, 31)));
+      expect(await repo.markPaid(monthly), DateTime(2026, 2, 28));
+
+      final last = await repo.add(
+        draft(
+          name: 'Рассрочка',
+          due: DateTime(2026, 11, 10),
+          ends: DateTime(2026, 11, 10),
+        ),
+      );
+      expect(await repo.markPaid(last), isNull);
+    });
+
+    test('сумма в истории может отличаться от обычной', () async {
+      final id = await repo.add(draft(amount: 69000));
+      await repo.markPaid(id, amountKopecks: 71500);
+      expect((await repo.watchRecords(id).first).single.amountKopecks, 71500);
+    });
+
     test('не двигает дату, если запись не удалась', () async {
       final id = await repo.add(draft(name: 'Вода', amount: null));
       await expectLater(repo.markPaid(id), throwsArgumentError);

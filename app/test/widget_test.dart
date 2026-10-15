@@ -4,7 +4,7 @@ import 'helpers/test_app.dart';
 
 void main() {
   appTest('нижняя навигация переключает вкладки', (tester, db) async {
-    expect(find.text('Здесь будут ближайшие платежи'), findsOneWidget);
+    expect(find.textContaining('Платежей пока нет'), findsOneWidget);
 
     await openTab(tester, 'Календарь');
 

@@ -105,7 +105,10 @@ class PaymentsRepository {
   /// Если платёж закончился (кредит выплачен), он становится неактивным.
   ///
   /// Для платежа с переменной суммой [amountKopecks] обязателен.
-  Future<void> markPaid(int id, {int? amountKopecks, DateTime? paidAt}) {
+  /// Сумма может отличаться от обычной (фактически оплачено).
+  ///
+  /// Возвращает новую ближайшую дату или null, если платёж закончился.
+  Future<DateTime?> markPaid(int id, {int? amountKopecks, DateTime? paidAt}) {
     return _db.transaction(() async {
       final payment = await getById(id);
       if (payment == null) throw StateError('Платёж $id не найден');
@@ -131,6 +134,7 @@ class PaymentsRepository {
             ? const PaymentsCompanion(isActive: Value(false))
             : PaymentsCompanion(nextDueAt: Value(next)),
       );
+      return next;
     });
   }
 
