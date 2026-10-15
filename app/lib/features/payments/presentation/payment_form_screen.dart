@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/format/date_format_ru.dart';
 import '../../../core/format/money.dart';
+import '../../reminders/data/reminder_providers.dart';
 import '../data/payments_providers.dart';
 import '../domain/payment_draft.dart';
 import '../domain/payment_schedule.dart';
@@ -118,8 +119,22 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
       await repo.update(widget.paymentId!, draft);
     } else {
       await repo.add(draft);
+      await _askNotificationPermission();
     }
     if (mounted) Navigator.of(context).pop(true);
+  }
+
+  /// После первого платежа просим разрешение на уведомления: в этот момент
+  /// понятно, зачем оно нужно. Отказ или сбой не мешают сохранению.
+  Future<void> _askNotificationPermission() async {
+    if (!ref.read(reminderSettingsProvider).enabled) return;
+    try {
+      await ref
+          .read(notificationSchedulerProvider)
+          .requestNotificationPermission();
+    } catch (e) {
+      debugPrint('Не удалось запросить разрешение на уведомления: $e');
+    }
   }
 
   Future<void> _delete() async {

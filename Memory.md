@@ -30,12 +30,14 @@
 ## 4. Текущее состояние
 - Фаза 1 готова, фаза 0 закрыта. Каркас в `app/`: `flutter analyze` и `flutter test` зелёные.
 - Debug-APK пересобран 2026-10-15 после вкладок «Платежи» и «Ближайшие» (174 МБ, пакет `app.ezhemesyachno`, название «Ежемесячно»): `app/build/app/outputs/flutter-apk/app-debug.apk`. Пользователю передан на проверку на телефоне; результат проверки пока неизвестен. `adb devices` пуст (телефон к ПК не подключён).
-- В GitHub отправлено всё до коммита `e78459c` включительно.
+- 2026-10-15: debug-APK с календарём и напоминаниями собран (191 МБ; aapt подтвердил POST_NOTIFICATIONS, RECEIVE_BOOT_COMPLETED, SCHEDULE_EXACT_ALARM и приёмники плагина). Пользователю на проверку ещё не передан.
+- В GitHub отправлено всё до коммита `e78459c` включительно; позже есть локальные коммиты.
 - GitHub: `https://github.com/Viktor-CSKA/Mobile_app.git`, `origin` подключён. Вход через Git Credential Manager в браузере: `git push` запускать в терминальной панели. Отправлять в GitHub только по просьбе пользователя.
 - Слои платежей: `domain/` (расписание, `PaymentDraft`), `data/` (репозиторий, провайдеры Riverpod), `presentation/` (список, форма). Приложение на русской локали (`flutter_localizations`). Деньги: `core/format/money.dart`, даты: `core/format/date_format_ru.dart`.
 - «Ближайшие»: `features/upcoming/` (`domain/upcoming_summary.dart`, экран, диалог `pay_dialog.dart`). «Сегодня» берётся из `todayProvider` (`core/clock.dart`), в тестах подменяется. Прогноз: `forecastOutstanding` (просрочка считается один раз). `markPaid` возвращает новую дату или `null`.
 - «Календарь»: `features/calendar/` (`domain/month_calendar.dart` — раскладка по дням и итоги, `data/calendar_providers.dart`, экран). Сетка — свой `GridView` без пакетов. Запланированное считается вперёд от `nextDueAt`, прошлое берётся из истории оплат. `daysBetween` в `payment_schedule.dart` — общий счёт дней.
-- Тесты: виджет-тесты через `appTest` (`test/helpers/test_app.dart`: база в памяти, высокий экран, `today:` и `seed:` — данные класть через `seed:` ДО запуска экранов, иначе запросы из `runAsync` зависают; снятие дерева в конце — иначе висит таймер Drift). Запуск зависших тестов: из Start-Process с ограничением по времени, не через `| Select-Object -First`.
+- Напоминания: `features/reminders/` — `domain/reminder_planner.dart` (чистая логика), `data/notification_scheduler.dart` (интерфейс), `data/local_notification_scheduler.dart` (flutter_local_notifications 22: все параметры именованные; время передаётся UTC-инстантом `tz.TZDateTime.from(dt, tz.UTC)`, база часовых поясов не нужна), `data/reminder_service.dart` (очередь пересчётов), `data/reminder_providers.dart` (`reminderSyncProvider` подключён в `app.dart`; `sharedPreferencesProvider` задаётся в `main`). Android: desugaring в `build.gradle.kts`, разрешения и приёмники в манифесте. SCHEDULE_EXACT_ALARM выбран вместо USE_EXACT_ALARM, чтобы не нарваться на проверку магазина; без него режим неточный.
+- Тесты: `FakeNotificationScheduler` (`test/helpers/fake_scheduler.dart`); `appTest` принимает `scheduler:`, `prefs:`, `now:`. Виджет-тесты через `appTest` (`test/helpers/test_app.dart`: база в памяти, высокий экран, `today:` и `seed:` — данные класть через `seed:` ДО запуска экранов, иначе запросы из `runAsync` зависают; снятие дерева в конце — иначе висит таймер Drift). Запуск зависших тестов: из Start-Process с ограничением по времени, не через `| Select-Object -First`.
 - Особенности среды (команды в CLAUDE.md): кириллица в пути → `subst P:`; `PUB_CACHE=P:\.pub-cache`; Gradle собирается только в терминальной панели (песочница блокирует loopback); политика PowerShell запрещает `.ps1`; терминальных вкладок не больше 6.
 
 ## 5. Следующие шаги (фаза 2, MVP)
@@ -47,7 +49,7 @@
 - [ ] Каталог шаблонов РФ (ЖКХ, кредит, рассрочки, налоги, популярные подписки) в форме «Новый платёж»
 - [x] Вкладка «Ближайшие»: сумма «нужно в этом месяце», просроченные сверху, кнопка «Оплачено» с диалогом суммы (103 теста зелёные)
 - [x] Вкладка «Календарь» (139 тестов зелёные; пользователь проверил «Платежи» и «Ближайшие» на телефоне — работают; календарь на телефоне ещё не смотрел)
-- [ ] Локальные напоминания (точные уведомления, POST_NOTIFICATIONS, после перезагрузки)
+- [x] Локальные напоминания написаны (193 теста зелёные), **ждут проверки на телефоне**: приходит ли уведомление («Проверить уведомление» в Настройках), точное время, после перезагрузки телефона
 - [ ] Отмена оплаты (Undo) и история оплат платежа
 - [ ] Экран «Ближайшие»: сумма «нужно в этом месяце», отметка «оплачено» двигает `nextDueAt`
 - [ ] Календарь, локальные напоминания, экспорт CSV/резервная копия, тесты логики дат
