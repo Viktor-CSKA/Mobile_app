@@ -55,7 +55,7 @@
 
 ## Публикация в RuStore (2026-10-15)
 - Решение пользователя: версия 1.0.0 выходит **без рекламы, без платёжек и без лимита**; лимит 15 платежей и Premium ~349 ₽ разово — следующая версия. Подробно и чек-лист: [[Notes/Публикация в RuStore]].
-- Готово: иконка (адаптивная + store/icon-512.png), подпись релиза (ключ вне репозитория C:\Users\CENTICORE\ezhemesyachno-signing\upload.jks, параметры в pp/android/key.properties, оба в .gitignore; **пользователю нужна резервная копия ключа**), релизная сборка 63 МБ (store/ezhemesyachno-1.0.0.apk, без INTERNET, R8 включён), проверена в эмуляторе (запуск, база, файловый диалог), 4 скриншота в store/screenshots/, политика docs/privacy.html (имя и почта подставлены 2026-10-16; GitHub Pages включены: https://viktor-cska.github.io/Mobile_app/privacy.html), тексты карточки.
+- Готово: иконка (адаптивная + store/icon-512.png), подпись релиза (ключ вне репозитория C:\Users\CENTICORE\ezhemesyachno-signing\upload.jks, параметры в pp/android/key.properties, оба в .gitignore; копия на ПК: `C:\Users\CENTICORE\Desktop\ezhemesyachno-key-backup` (2026-10-16, SHA-256 сертификата 446E6C93…2B199B), **пользователю нужно перенести её на флешку или в облако**), релизная сборка 63 МБ (store/ezhemesyachno-1.0.0.apk, без INTERNET, R8 включён), проверена в эмуляторе (запуск, база, файловый диалог), 4 скриншота в store/screenshots/, политика docs/privacy.html (имя и почта подставлены 2026-10-16; GitHub Pages включены: https://viktor-cska.github.io/Mobile_app/privacy.html), тексты карточки.
 - Ждёт пользователя: аккаунт RuStore Консоль, загрузка APK (RuStore рекомендует свой сертификат, то есть наш ключ; те же ключ и пакет для всех обновлений), резервная копия ключа.
 
 ## 5. Следующие шаги (фаза 2, MVP)
