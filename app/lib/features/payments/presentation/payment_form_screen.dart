@@ -192,7 +192,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
-          content: Text('Платёж убран в архив: вкладка «Платежи»'),
+          content: Text('Платёж убран в архив: он внизу списка платежей'),
         ),
       );
     if (mounted) Navigator.of(context).pop(true);

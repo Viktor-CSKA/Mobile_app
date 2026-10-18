@@ -66,7 +66,10 @@ void main() {
       await tester.tap(find.byTooltip('В архив'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Платёж убран в архив: вкладка «Платежи»'), findsOne);
+      expect(
+        find.text('Платёж убран в архив: он внизу списка платежей'),
+        findsOne,
+      );
       expect(tile('Интернет'), findsNothing);
       expect(find.text('Архив · 1'), findsOneWidget);
 
