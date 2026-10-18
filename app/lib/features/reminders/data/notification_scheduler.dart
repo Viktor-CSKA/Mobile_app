@@ -23,6 +23,14 @@ abstract class NotificationScheduler {
   /// Открывает системные настройки, где пользователь включает точные будильники.
   Future<void> requestExactAlarms();
 
+  /// Платежи, по уведомлениям о которых нажал пользователь, пока приложение
+  /// было запущено.
+  Stream<int> get tappedPayments;
+
+  /// Платёж из уведомления, по нажатию на которое запустилось приложение;
+  /// null при обычном запуске. Вызывается один раз при старте.
+  Future<int?> launchedByPayment();
+
   /// Показывает тестовое уведомление через [after].
   Future<void> scheduleTest({
     required Duration after,

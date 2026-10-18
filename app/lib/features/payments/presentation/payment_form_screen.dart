@@ -40,6 +40,13 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
   bool _loading = false;
   bool _saving = false;
 
+  /// false — платёж в архиве (выплачен или убран вручную).
+  bool _isActive = true;
+
+  /// У платежа из архива закончился срок: после «Сохранить» он вернётся в
+  /// список с новыми датами.
+  bool _reactivate = false;
+
   bool get _isEdit => widget.paymentId != null;
 
   @override
@@ -73,6 +80,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
       _remindDays = payment.remindDaysBefore;
       _nextDue = dateOnly(payment.nextDueAt);
       _endsAt = payment.endsAt == null ? null : dateOnly(payment.endsAt!);
+      _isActive = payment.isActive;
       _loading = false;
     });
   }
@@ -154,7 +162,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
     setState(() => _saving = true);
     final repo = ref.read(paymentsRepositoryProvider);
     if (_isEdit) {
-      await repo.update(widget.paymentId!, draft);
+      await repo.update(widget.paymentId!, draft, reactivate: _reactivate);
     } else {
       await repo.add(draft);
       await _askNotificationPermission();
@@ -172,6 +180,39 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
           .requestNotificationPermission();
     } catch (e) {
       debugPrint('Не удалось запросить разрешение на уведомления: $e');
+    }
+  }
+
+  /// Убирает платёж в архив: история остаётся, из «Ближайших», календаря и
+  /// напоминаний он пропадает.
+  Future<void> _archive() async {
+    final messenger = ScaffoldMessenger.of(context);
+    await ref.read(paymentsRepositoryProvider).archive(widget.paymentId!);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Платёж убран в архив: вкладка «Платежи»'),
+        ),
+      );
+    if (mounted) Navigator.of(context).pop(true);
+  }
+
+  Future<void> _unarchive() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final back = await ref
+        .read(paymentsRepositoryProvider)
+        .unarchive(widget.paymentId!, today: ref.read(todayProvider));
+    if (!mounted) return;
+    if (back) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Платёж вернулся в список')),
+        );
+      Navigator.of(context).pop(true);
+    } else {
+      setState(() => _reactivate = true);
     }
   }
 
@@ -212,6 +253,12 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
       appBar: AppBar(
         title: Text(_isEdit ? 'Платёж' : 'Новый платёж'),
         actions: [
+          if (_isEdit && _isActive && !_loading)
+            IconButton(
+              tooltip: 'В архив',
+              icon: const Icon(Icons.archive_outlined),
+              onPressed: _archive,
+            ),
           if (_isEdit)
             IconButton(
               tooltip: 'Удалить',
@@ -229,6 +276,13 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (_isEdit && !_isActive) ...[
+                      _ArchiveBanner(
+                        reactivate: _reactivate,
+                        onRestore: _unarchive,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     if (!_isEdit) ...[
                       Text(
                         'Быстрый выбор',
@@ -401,6 +455,45 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                 ),
               ),
             ),
+    );
+  }
+}
+
+/// Плашка наверху формы платежа из архива.
+class _ArchiveBanner extends StatelessWidget {
+  const _ArchiveBanner({required this.reactivate, required this.onRestore});
+
+  final bool reactivate;
+  final VoidCallback onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      color: scheme.secondaryContainer,
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              reactivate
+                  ? 'Срок платежа закончился. Измените даты и нажмите '
+                        '«Сохранить»: платёж вернётся в список.'
+                  : 'Платёж в архиве: его нет в «Ближайших», календаре и '
+                        'напоминаниях. История оплат сохранена.',
+            ),
+            if (!reactivate) ...[
+              const SizedBox(height: 12),
+              FilledButton.tonal(
+                onPressed: onRestore,
+                child: const Text('Вернуть из архива'),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

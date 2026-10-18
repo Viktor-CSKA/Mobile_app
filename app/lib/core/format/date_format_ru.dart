@@ -57,3 +57,8 @@ String formatDayMonthShort(DateTime d) =>
 /// `2026-10-05` → `5 октября 2026`.
 String formatDateFull(DateTime d) =>
     '${d.day} ${_monthsGenitive[d.month - 1]} ${d.year}';
+
+/// `2026-10-05 18:07` → `5 окт, 18:07`.
+String formatDayMonthTime(DateTime d) =>
+    '${formatDayMonthShort(d)}, '
+    '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';

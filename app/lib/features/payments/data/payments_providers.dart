@@ -13,6 +13,11 @@ final activePaymentsProvider = StreamProvider<List<PaymentWithCategory>>(
   (ref) => ref.watch(paymentsRepositoryProvider).watchActive(),
 );
 
+/// Платежи в архиве (выплаченные и убранные вручную).
+final archivedPaymentsProvider = StreamProvider<List<PaymentWithCategory>>(
+  (ref) => ref.watch(paymentsRepositoryProvider).watchArchived(),
+);
+
 /// История оплат одного платежа, новые сверху.
 final paymentRecordsProvider = StreamProvider.family<List<PaymentRecord>, int>(
   (ref, paymentId) =>

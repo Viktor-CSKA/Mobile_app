@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/format/date_format_ru.dart';
 import '../../../core/format/plural_ru.dart';
 import '../../backup/data/backup_providers.dart';
 import '../../backup/data/data_transfer_service.dart';
@@ -91,8 +92,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         title: const Text('Восстановить из копии?'),
         content: const Text(
           'Все текущие платежи и история оплат будут заменены данными из '
-          'выбранного файла. Это действие нельзя отменить: при необходимости '
-          'сначала сохраните резервную копию.',
+          'выбранного файла. Перед этим приложение само сохранит копию '
+          'нынешних данных: вернуть их можно будет в настройках.',
         ),
         actions: [
           TextButton(
@@ -112,17 +113,57 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         .read(dataTransferServiceProvider)
         .restoreFromFile();
     if (!mounted) return;
+    ref.invalidate(safetyInfoProvider);
     switch (result.status) {
       case TransferStatus.restored:
-        _say(
-          'Восстановлено: ${paymentsCountLabel(result.payments)}, '
-          '${result.records} ${pluralRu(result.records, 'оплата', 'оплаты', 'оплат')}',
-        );
+        _say('Восстановлено: ${_countsText(result)}');
       case TransferStatus.failed:
         _say('Файл не подошёл: ${result.message ?? 'неизвестная ошибка'}');
       case TransferStatus.cancelled || TransferStatus.saved:
         break;
     }
+  }
+
+  String _countsText(TransferResult r) =>
+      '${paymentsCountLabel(r.payments)}, '
+      '${r.records} ${pluralRu(r.records, 'оплата', 'оплаты', 'оплат')}';
+
+  /// Возвращает данные, которые были до последнего восстановления из файла.
+  Future<void> _restoreSafety(SafetyInfo info) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Вернуть прежние данные?'),
+        content: Text(
+          'Текущие платежи и история оплат будут заменены данными, которые '
+          'были до последнего восстановления: '
+          '${paymentsCountLabel(info.payments)}, копия от '
+          '${formatDayMonthTime(info.savedAt)}.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Вернуть'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final result = await ref
+        .read(dataTransferServiceProvider)
+        .restoreSafetyCopy();
+    ref.invalidate(safetyInfoProvider);
+    if (!mounted) return;
+    _say(
+      result.status == TransferStatus.restored
+          ? 'Возвращено: ${_countsText(result)}'
+          : result.message ?? 'Не удалось вернуть данные',
+    );
   }
 
   Future<void> _sendTest() async {
@@ -147,6 +188,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   Widget build(BuildContext context) {
     final settings = ref.watch(reminderSettingsProvider);
     final status = ref.watch(notificationStatusProvider).value;
+    final safety = ref.watch(safetyInfoProvider).value;
     final minutes = settings.minutesOfDay;
     final time =
         '${(minutes ~/ 60).toString().padLeft(2, '0')}:${(minutes % 60).toString().padLeft(2, '0')}';
@@ -233,6 +275,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             subtitle: const Text('Заменит текущие данные содержимым файла'),
             onTap: _restore,
           ),
+          if (safety != null)
+            ListTile(
+              leading: const Icon(Icons.undo),
+              title: const Text('Вернуть данные до восстановления'),
+              subtitle: Text(
+                'Копия от ${formatDayMonthTime(safety.savedAt)}: '
+                '${paymentsCountLabel(safety.payments)}',
+              ),
+              onTap: () => _restoreSafety(safety),
+            ),
           ListTile(
             leading: const Icon(Icons.table_chart_outlined),
             title: const Text('Экспорт платежей (CSV)'),

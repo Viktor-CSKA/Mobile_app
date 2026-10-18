@@ -6,11 +6,13 @@ import 'package:ezhemesyachno/core/database/app_database.dart';
 import 'package:ezhemesyachno/features/backup/data/backup_repository.dart';
 import 'package:ezhemesyachno/features/backup/data/data_transfer_service.dart';
 import 'package:ezhemesyachno/features/backup/data/file_gateway.dart';
+import 'package:ezhemesyachno/features/backup/data/safety_backup_store.dart';
 import 'package:ezhemesyachno/features/backup/domain/backup_codec.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/backup_samples.dart';
 import '../../helpers/fake_file_gateway.dart';
+import '../../helpers/fake_safety_store.dart';
 
 final fixedNow = DateTime(2026, 10, 15, 14, 30);
 
@@ -18,13 +20,15 @@ void main() {
   late AppDatabase db;
   late BackupRepository repo;
   late FakeFileGateway files;
+  late FakeSafetyBackupStore safety;
   late DataTransferService service;
 
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
     repo = BackupRepository(db);
     files = FakeFileGateway();
-    service = DataTransferService(repo, files, () => fixedNow);
+    safety = FakeSafetyBackupStore();
+    service = DataTransferService(repo, files, safety, () => fixedNow);
     await repo.replaceAll(sampleData());
   });
 
@@ -117,6 +121,7 @@ void main() {
         final otherService = DataTransferService(
           BackupRepository(other),
           otherFiles,
+          FakeSafetyBackupStore(),
           () => fixedNow,
         );
 
@@ -205,6 +210,100 @@ void main() {
       final r = await service.restoreFromFile();
 
       expect(r.status, TransferStatus.restored);
+      expectSameData(await repo.readAll(), sampleData());
+    });
+  });
+
+  group('страховочная копия', () {
+    const onlyCategory = BackupData(
+      categories: [kHousing],
+      payments: [],
+      records: [],
+    );
+    String otherText() => encodeBackup(onlyCategory, exportedAt: fixedNow);
+
+    test('перед восстановлением сохраняются прежние данные', () async {
+      files.pickText(otherText());
+
+      final r = await service.restoreFromFile();
+
+      expect(r.status, TransferStatus.restored);
+      expect(safety.copy!.savedAt, fixedNow);
+      expectSameData(decodeBackup(safety.copy!.text), sampleData());
+    });
+
+    test('пустые данные не затирают прежнюю копию', () async {
+      await repo.replaceAll(onlyCategory);
+      final old = SafetyCopy(savedAt: DateTime(2026, 1, 1), text: otherText());
+      safety.copy = old;
+      files.pickText(backupText());
+
+      await service.restoreFromFile();
+
+      expect(safety.saveCalls, 0);
+      expect(safety.copy, same(old));
+    });
+
+    test('неподходящий файл копию не создаёт', () async {
+      files.pickText('это просто текст');
+      await service.restoreFromFile();
+      expect(safety.saveCalls, 0);
+    });
+
+    test('не удалось сохранить копию: данные не тронуты', () async {
+      safety.saveError = Exception('нет места');
+      files.pickText(otherText());
+
+      final r = await service.restoreFromFile();
+
+      expect(r.status, TransferStatus.failed);
+      expect(r.message, contains('страховочную копию'));
+      expectSameData(await repo.readAll(), sampleData());
+    });
+
+    test('сведения о копии: нет — null, есть — количество и время', () async {
+      expect(await service.safetyCopyInfo(), isNull);
+
+      files.pickText(otherText());
+      await service.restoreFromFile();
+
+      final info = (await service.safetyCopyInfo())!;
+      expect(info.savedAt, fixedNow);
+      expect(info.payments, 4);
+      expect(info.records, 2);
+    });
+
+    test('возврат из копии работает и повторно', () async {
+      files.pickText(otherText());
+      await service.restoreFromFile();
+      expectSameData(await repo.readAll(), onlyCategory);
+
+      final back = await service.restoreSafetyCopy();
+      expect(back.status, TransferStatus.restored);
+      expect(back.payments, 4);
+      expectSameData(await repo.readAll(), sampleData());
+
+      // Состояние до возврата было без платежей, поэтому копия не затёрта
+      // пустотой и возврат можно повторить.
+      final again = await service.restoreSafetyCopy();
+      expect(again.status, TransferStatus.restored);
+      expectSameData(await repo.readAll(), sampleData());
+    });
+
+    test('возврат без копии: ошибка, данные целы', () async {
+      final r = await service.restoreSafetyCopy();
+      expect(r.status, TransferStatus.failed);
+      expect(r.message, contains('Страховочной копии нет'));
+      expectSameData(await repo.readAll(), sampleData());
+    });
+
+    test('повреждённая копия не применяется', () async {
+      safety.copy = SafetyCopy(savedAt: fixedNow, text: 'не json');
+
+      expect(await service.safetyCopyInfo(), isNull);
+      final r = await service.restoreSafetyCopy();
+
+      expect(r.status, TransferStatus.failed);
       expectSameData(await repo.readAll(), sampleData());
     });
   });

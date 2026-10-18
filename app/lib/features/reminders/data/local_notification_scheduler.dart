@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -42,13 +44,35 @@ class LocalNotificationScheduler implements NotificationScheduler {
 
   Future<void> _ensureInit() => _init ??= _initialize();
 
+  final _taps = StreamController<int>.broadcast();
+
+  @override
+  Stream<int> get tappedPayments => _taps.stream;
+
+  /// Идентификатор платежа из данных уведомления; у тестового уведомления
+  /// данных нет, и оно игнорируется.
+  static int? _paymentIdOf(String? payload) =>
+      payload == null ? null : int.tryParse(payload);
+
   Future<void> _initialize() async {
     await _plugin.initialize(
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       ),
+      onDidReceiveNotificationResponse: (response) {
+        final id = _paymentIdOf(response.payload);
+        if (id != null) _taps.add(id);
+      },
     );
     await _android?.createNotificationChannel(_channel);
+  }
+
+  @override
+  Future<int?> launchedByPayment() async {
+    await _ensureInit();
+    final details = await _plugin.getNotificationAppLaunchDetails();
+    if (details == null || !details.didNotificationLaunchApp) return null;
+    return _paymentIdOf(details.notificationResponse?.payload);
   }
 
   Future<AndroidScheduleMode> _mode() async {

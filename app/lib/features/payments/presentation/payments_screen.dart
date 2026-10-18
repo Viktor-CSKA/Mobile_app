@@ -22,6 +22,7 @@ class PaymentsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final payments = ref.watch(activePaymentsProvider);
+    final archived = ref.watch(archivedPaymentsProvider).value ?? const [];
 
     return Scaffold(
       appBar: AppBar(title: const Text('Платежи')),
@@ -34,18 +35,44 @@ class PaymentsScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) =>
             Center(child: Text('Не удалось загрузить платежи: $e')),
-        data: (items) => items.isEmpty
-            ? const _EmptyState()
-            : ListView.separated(
-                padding: const EdgeInsets.only(bottom: 88),
-                itemCount: items.length,
-                separatorBuilder: (_, _) => const Divider(height: 1),
-                itemBuilder: (context, i) => _PaymentTile(
-                  item: items[i],
-                  onTap: () =>
-                      _openForm(context, paymentId: items[i].payment.id),
+        data: (items) {
+          if (items.isEmpty && archived.isEmpty) return const _EmptyState();
+          return ListView(
+            padding: const EdgeInsets.only(bottom: 88),
+            children: [
+              if (items.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text(
+                    'Активных платежей нет.',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
-              ),
+              for (final item in items) ...[
+                _PaymentTile(
+                  item: item,
+                  onTap: () => _openForm(context, paymentId: item.payment.id),
+                ),
+                const Divider(height: 1),
+              ],
+              if (archived.isNotEmpty)
+                ExpansionTile(
+                  leading: const Icon(Icons.archive_outlined),
+                  title: Text('Архив · ${archived.length}'),
+                  subtitle: const Text('Выплаченные и убранные платежи'),
+                  children: [
+                    for (final item in archived)
+                      _PaymentTile(
+                        item: item,
+                        archived: true,
+                        onTap: () =>
+                            _openForm(context, paymentId: item.payment.id),
+                      ),
+                  ],
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -69,29 +96,38 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _PaymentTile extends StatelessWidget {
-  const _PaymentTile({required this.item, required this.onTap});
+  const _PaymentTile({
+    required this.item,
+    required this.onTap,
+    this.archived = false,
+  });
 
   final PaymentWithCategory item;
   final VoidCallback onTap;
+
+  /// Платёж из архива: без ближайшей даты, приглушённый цвет.
+  final bool archived;
 
   @override
   Widget build(BuildContext context) {
     final p = item.payment;
     final amount = p.amountKopecks;
+    final subtitle = archived
+        ? '${item.category.name} · ${periodLabel(p.periodMonths)}'
+        : '${item.category.name} · ${periodLabel(p.periodMonths)} · '
+              '${formatDayMonthShort(p.nextDueAt)}';
     return ListTile(
       onTap: onTap,
       leading: CircleAvatar(
-        backgroundColor: Color(item.category.colorValue),
+        backgroundColor: Color(item.category.colorValue)
+            .withValues(alpha: archived ? 0.5 : 1),
         child: Text(
           p.name.characters.first.toUpperCase(),
           style: const TextStyle(color: Colors.white),
         ),
       ),
       title: Text(p.name),
-      subtitle: Text(
-        '${item.category.name} · ${periodLabel(p.periodMonths)} · '
-        '${formatDayMonthShort(p.nextDueAt)}',
-      ),
+      subtitle: Text(subtitle),
       trailing: Text(
         amount == null ? 'сумма меняется' : formatKopecks(amount),
         style: Theme.of(context).textTheme.titleSmall,

@@ -154,4 +154,53 @@ void main() {
     today: today,
     seed: seedCalendar,
   );
+
+  appTest(
+    'нажатие на оплаченную запись открывает платёж с историей оплат',
+    (tester, db) async {
+      await openCalendar(tester);
+      await pickDay(tester, '12');
+
+      await tester.tap(find.text('Вода'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Платёж'), findsOneWidget);
+      expect(find.text('История оплат'), findsOneWidget);
+    },
+    today: today,
+    seed: seedCalendar,
+  );
+
+  appTest(
+    'платёж в архиве: прошлые оплаты видны в календаре, будущих нет',
+    (tester, db) async {
+      await openCalendar(tester);
+
+      // Оплата 12 октября осталась, запланированных платежей воды нет.
+      await pickDay(tester, '12');
+      expect(find.text('Вода'), findsOneWidget);
+      expect(find.textContaining('Оплачено ·'), findsOneWidget);
+      expect(find.textContaining('Запланировано: 0'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Следующий месяц'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Запланировано: 0'), findsOneWidget);
+      expect(find.textContaining('Оплачено: 0'), findsOneWidget);
+    },
+    today: today,
+    seed: (db) async {
+      final repo = PaymentsRepository(db);
+      final cat = (await repo.watchCategories().first).first.id;
+      final id = await repo.add(
+        PaymentDraft(
+          name: 'Вода',
+          categoryId: cat,
+          amountKopecks: 40000,
+          nextDueAt: DateTime(2026, 10, 12),
+        ),
+      );
+      await repo.markPaid(id, paidAt: DateTime(2026, 10, 12, 18, 30));
+      await repo.archive(id);
+    },
+  );
 }

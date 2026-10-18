@@ -339,7 +339,9 @@ class _DayEntries extends StatelessWidget {
           ),
         for (final e in entries)
           ListTile(
-            onTap: e.paid ? null : () => onOpen(e.paymentId),
+            // Оплаченную запись тоже можно открыть: в форме платежа есть
+            // история оплат.
+            onTap: () => onOpen(e.paymentId),
             leading: CircleAvatar(
               backgroundColor: Color(e.colorValue),
               child: Icon(

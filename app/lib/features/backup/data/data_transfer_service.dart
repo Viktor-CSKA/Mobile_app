@@ -5,6 +5,7 @@ import '../domain/backup_codec.dart';
 import '../domain/csv_export.dart';
 import 'backup_repository.dart';
 import 'file_gateway.dart';
+import 'safety_backup_store.dart';
 
 enum TransferStatus { saved, restored, cancelled, failed }
 
@@ -27,12 +28,26 @@ class TransferResult {
   final int records;
 }
 
+/// Описание страховочной копии для экрана настроек.
+class SafetyInfo {
+  const SafetyInfo({
+    required this.savedAt,
+    required this.payments,
+    required this.records,
+  });
+
+  final DateTime savedAt;
+  final int payments;
+  final int records;
+}
+
 /// Экспорт данных в файлы и восстановление из резервной копии.
 class DataTransferService {
-  DataTransferService(this._repo, this._files, this._now);
+  DataTransferService(this._repo, this._files, this._safety, this._now);
 
   final BackupRepository _repo;
   final FileGateway _files;
+  final SafetyBackupStore _safety;
   final DateTime Function() _now;
 
   /// Верхний предел размера файла копии.
@@ -91,6 +106,61 @@ class DataTransferService {
       data = decodeBackup(utf8.decode(bytes, allowMalformed: true));
     } on BackupFormatException catch (e) {
       return TransferResult(TransferStatus.failed, message: e.message);
+    }
+
+    return _replaceWith(data);
+  }
+
+  /// Что лежит в страховочной копии; null, если копии нет.
+  Future<SafetyInfo?> safetyCopyInfo() async {
+    final copy = await _safety.load();
+    if (copy == null) return null;
+    try {
+      final data = decodeBackup(copy.text);
+      return SafetyInfo(
+        savedAt: copy.savedAt,
+        payments: data.payments.length,
+        records: data.records.length,
+      );
+    } on BackupFormatException {
+      return null;
+    }
+  }
+
+  /// Возвращает данные из страховочной копии. Нынешние данные при этом тоже
+  /// становятся страховочной копией, поэтому действие можно отменить так же.
+  Future<TransferResult> restoreSafetyCopy() async {
+    final copy = await _safety.load();
+    final BackupData data;
+    try {
+      if (copy == null) throw const BackupFormatException('Копии нет');
+      data = decodeBackup(copy.text);
+    } on BackupFormatException {
+      return const TransferResult(
+        TransferStatus.failed,
+        message: 'Страховочной копии нет или она повреждена',
+      );
+    }
+    return _replaceWith(data);
+  }
+
+  /// Сохраняет страховочную копию текущих данных и заменяет их на [data].
+  /// Если копию сохранить не удалось, данные не трогаем: замена необратима.
+  /// Пустые данные копировать не нужно, чтобы не затереть более раннюю копию.
+  Future<TransferResult> _replaceWith(BackupData data) async {
+    try {
+      final current = await _repo.readAll();
+      final hasData = current.payments.isNotEmpty || current.records.isNotEmpty;
+      if (hasData) {
+        final now = _now();
+        await _safety.save(encodeBackup(current, exportedAt: now), now);
+      }
+    } catch (e) {
+      return TransferResult(
+        TransferStatus.failed,
+        message:
+            'Не удалось сохранить страховочную копию, данные не тронуты: $e',
+      );
     }
 
     try {

@@ -345,6 +345,115 @@ void main() {
     });
   });
 
+  group('архив', () {
+    test('archive убирает платёж из активных, история остаётся', () async {
+      final id = await repo.add(draft());
+      await repo.markPaid(id, paidAt: DateTime(2026, 10, 14));
+
+      await repo.archive(id);
+
+      expect(await repo.watchActive().first, isEmpty);
+      final archived = await repo.watchArchived().first;
+      expect(archived.single.payment.id, id);
+      expect((await repo.watchRecords(id).first).length, 1);
+    });
+
+    test('archive несуществующего платежа — ошибка', () async {
+      expect(() => repo.archive(999), throwsStateError);
+    });
+
+    test('в архиве выплаченные кредиты тоже, по названию', () async {
+      final loan = await repo.add(
+        draft(
+          name: 'Рассрочка',
+          due: DateTime(2026, 11, 10),
+          ends: DateTime(2026, 11, 10),
+        ),
+      );
+      await repo.markPaid(loan);
+      final manual = await repo.add(draft(name: 'Аренда'));
+      await repo.archive(manual);
+
+      final names = (await repo.watchArchived().first).map(
+        (e) => e.payment.name,
+      );
+      expect(names, ['Аренда', 'Рассрочка']);
+    });
+
+    test('unarchive с будущей датой оставляет её', () async {
+      final id = await repo.add(draft(due: DateTime(2026, 11, 20)));
+      await repo.archive(id);
+
+      final ok = await repo.unarchive(id, today: DateTime(2026, 10, 15));
+
+      expect(ok, isTrue);
+      final p = (await repo.getById(id))!;
+      expect(p.isActive, isTrue);
+      expect(p.nextDueAt, DateTime(2026, 11, 20));
+    });
+
+    test('unarchive сдвигает прошедшую дату на ближайшую будущую', () async {
+      final id = await repo.add(draft(due: DateTime(2026, 7, 20)));
+      await repo.archive(id);
+
+      await repo.unarchive(id, today: DateTime(2026, 10, 15));
+
+      expect((await repo.getById(id))!.nextDueAt, DateTime(2026, 10, 20));
+    });
+
+    test('unarchive: сегодняшняя дата остаётся сегодняшней', () async {
+      final id = await repo.add(draft(due: DateTime(2026, 8, 15)));
+      await repo.archive(id);
+
+      await repo.unarchive(id, today: DateTime(2026, 10, 15));
+
+      expect((await repo.getById(id))!.nextDueAt, DateTime(2026, 10, 15));
+    });
+
+    test('unarchive выплаченного кредита: false, ничего не меняется', () async {
+      final id = await repo.add(
+        draft(due: DateTime(2026, 8, 10), ends: DateTime(2026, 8, 10)),
+      );
+      await repo.markPaid(id);
+
+      final ok = await repo.unarchive(id, today: DateTime(2026, 10, 15));
+
+      expect(ok, isFalse);
+      final p = (await repo.getById(id))!;
+      expect(p.isActive, isFalse);
+      expect(p.nextDueAt, DateTime(2026, 8, 10));
+    });
+
+    test('update не возвращает платёж из архива сам', () async {
+      final id = await repo.add(draft());
+      await repo.archive(id);
+
+      await repo.update(id, draft(name: 'Интернет дом'));
+
+      final p = (await repo.getById(id))!;
+      expect(p.name, 'Интернет дом');
+      expect(p.isActive, isFalse);
+    });
+
+    test('update с reactivate возвращает платёж и новые даты', () async {
+      final id = await repo.add(
+        draft(due: DateTime(2026, 8, 10), ends: DateTime(2026, 8, 10)),
+      );
+      await repo.markPaid(id);
+
+      await repo.update(
+        id,
+        draft(due: DateTime(2026, 11, 10), ends: DateTime(2027, 2, 10)),
+        reactivate: true,
+      );
+
+      final p = (await repo.getById(id))!;
+      expect(p.isActive, isTrue);
+      expect(p.nextDueAt, DateTime(2026, 11, 10));
+      expect(await repo.watchArchived().first, isEmpty);
+    });
+  });
+
   test('delete удаляет платёж и его историю', () async {
     final id = await repo.add(draft());
     await repo.markPaid(id);

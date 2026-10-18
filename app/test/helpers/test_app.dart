@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fake_file_gateway.dart';
+import 'fake_safety_store.dart';
 import 'fake_scheduler.dart';
 
 /// Виджет-тест приложения с базой в памяти (вместо файла на устройстве).
@@ -22,6 +23,8 @@ import 'fake_scheduler.dart';
 ///   «сейчас» при этом 08:00 этого дня (если не задано [now]).
 /// * [seed] — заполняет базу до запуска экранов.
 /// * [scheduler] — подмена платформенных уведомлений (по умолчанию новая).
+/// * [files] — подмена системных диалогов выбора и сохранения файла.
+/// * [safety] — подмена хранилища страховочной копии (по умолчанию пустое).
 /// * [prefs] — начальные значения SharedPreferences.
 void appTest(
   String description,
@@ -31,6 +34,7 @@ void appTest(
   Future<void> Function(AppDatabase db)? seed,
   FakeNotificationScheduler? scheduler,
   FakeFileGateway? files,
+  FakeSafetyBackupStore? safety,
   Map<String, Object> prefs = const {},
 }) {
   testWidgets(description, (tester) async {
@@ -65,6 +69,9 @@ void appTest(
             scheduler ?? FakeNotificationScheduler(),
           ),
           fileGatewayProvider.overrideWithValue(files ?? FakeFileGateway()),
+          safetyBackupStoreProvider.overrideWithValue(
+            safety ?? FakeSafetyBackupStore(),
+          ),
           if (today != null) todayProvider.overrideWithValue(today),
           if (fakeNow != null) nowProvider.overrideWithValue(fakeNow),
         ],

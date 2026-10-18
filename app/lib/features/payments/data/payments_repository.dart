@@ -35,6 +35,28 @@ class PaymentsRepository {
     );
   }
 
+  /// Платежи в архиве: выплаченные кредиты и убранные вручную. По названию.
+  Stream<List<PaymentWithCategory>> watchArchived() {
+    final query =
+        _db.select(_db.payments).join([
+            innerJoin(
+              _db.categories,
+              _db.categories.id.equalsExp(_db.payments.categoryId),
+            ),
+          ])
+          ..where(_db.payments.isActive.equals(false))
+          ..orderBy([OrderingTerm.asc(_db.payments.name)]);
+    return query.watch().map(
+      (rows) => [
+        for (final row in rows)
+          PaymentWithCategory(
+            row.readTable(_db.payments),
+            row.readTable(_db.categories),
+          ),
+      ],
+    );
+  }
+
   /// Оплаты за период [from]..[to] включительно (по дню оплаты), в том числе
   /// по уже закрытым платежам. Старые по дате — первыми.
   Stream<List<PaidEntry>> watchPaidBetween(DateTime from, DateTime to) {
@@ -102,8 +124,50 @@ class PaymentsRepository {
         );
   }
 
+  /// Убирает платёж из списка, «Ближайших», календаря и напоминаний. История
+  /// оплат остаётся (оплаты по-прежнему видны в календаре за свои месяцы).
+  Future<void> archive(int id) async {
+    final updated =
+        await (_db.update(_db.payments)..where((p) => p.id.equals(id))).write(
+          const PaymentsCompanion(isActive: Value(false)),
+        );
+    if (updated == 0) throw StateError('Платёж $id не найден');
+  }
+
+  /// Возвращает платёж из архива. Дату, которая уже прошла, сдвигает на
+  /// ближайшую сегодняшнюю или будущую. Возвращает false и ничего не меняет,
+  /// если срок платежа закончился (кредит выплачен): его нужно изменить через
+  /// [update] с `reactivate: true`.
+  Future<bool> unarchive(int id, {required DateTime today}) async {
+    final payment = await getById(id);
+    if (payment == null) throw StateError('Платёж $id не найден');
+    var schedule = payment.schedule;
+    while (schedule.isOverdue(today)) {
+      final next = schedule.followingDue();
+      if (next == null) return false;
+      schedule = PaymentSchedule(
+        nextDueAt: next,
+        anchorDay: payment.anchorDay,
+        periodMonths: payment.periodMonths,
+        endsAt: payment.endsAt,
+      );
+    }
+    await (_db.update(_db.payments)..where((p) => p.id.equals(id))).write(
+      PaymentsCompanion(
+        isActive: const Value(true),
+        nextDueAt: Value(dateOnly(schedule.nextDueAt)),
+      ),
+    );
+    return true;
+  }
+
   /// Обновляет платёж. Если дата изменилась, исходный день берётся из новой.
-  Future<void> update(int id, PaymentDraft draft) async {
+  /// Платёж из архива остаётся в архиве, пока не передано `reactivate: true`.
+  Future<void> update(
+    int id,
+    PaymentDraft draft, {
+    bool reactivate = false,
+  }) async {
     _check(draft);
     final existing = await getById(id);
     if (existing == null) throw StateError('Платёж $id не найден');
@@ -120,7 +184,7 @@ class PaymentsRepository {
         remindDaysBefore: Value(draft.remindDaysBefore),
         endsAt: Value(_endDate(draft)),
         note: Value(draft.note.trim()),
-        isActive: const Value(true),
+        isActive: Value(reactivate || existing.isActive),
       ),
     );
   }

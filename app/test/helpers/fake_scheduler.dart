@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ezhemesyachno/features/reminders/data/notification_scheduler.dart';
 import 'package:ezhemesyachno/features/reminders/domain/reminder_planner.dart';
 
@@ -22,6 +24,18 @@ class FakeNotificationScheduler implements NotificationScheduler {
 
   /// Если true — replaceAll бросает ошибку.
   bool failReplace = false;
+
+  /// Нажатия на уведомления во время работы приложения: `taps.add(paymentId)`.
+  final StreamController<int> taps = StreamController<int>.broadcast();
+
+  /// Платёж, по уведомлению о котором «запущено» приложение (null — обычный запуск).
+  int? launchPaymentId;
+
+  @override
+  Stream<int> get tappedPayments => taps.stream;
+
+  @override
+  Future<int?> launchedByPayment() async => launchPaymentId;
 
   List<PlannedReminder> get lastPlan =>
       replaceCalls.isEmpty ? const [] : replaceCalls.last;

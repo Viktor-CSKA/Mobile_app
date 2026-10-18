@@ -254,4 +254,76 @@ void main() {
       files: g5,
     );
   });
+
+  group('страховочная копия', () {
+    appTest(
+      'пока восстановлений не было, пункта возврата нет',
+      (tester, db) async {
+        await openSettings(tester);
+        expect(find.text('Вернуть данные до восстановления'), findsNothing);
+      },
+      today: today,
+      seed: seedSample,
+    );
+
+    final h2 = FakeFileGateway();
+    h2.pickText(otherBackup());
+    appTest(
+      'после восстановления данные можно вернуть из копии',
+      (tester, db) async {
+        await openSettings(tester);
+        await tester.tap(find.text('Восстановить из копии'));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('само сохранит копию'), findsOneWidget);
+        await tester.tap(find.text('Выбрать файл'));
+        await tester.pumpAndSettle();
+
+        // Появился пункт с описанием копии: время и число платежей.
+        expect(find.text('Вернуть данные до восстановления'), findsOneWidget);
+        expect(find.text('Копия от 15 окт, 08:00: 4 платежа'), findsOneWidget);
+        expect(
+          (await BackupRepository(db).readAll()).payments.single.name,
+          'Кинопоиск',
+        );
+
+        await tester.tap(find.text('Вернуть данные до восстановления'));
+        await tester.pumpAndSettle();
+        expect(find.text('Вернуть прежние данные?'), findsOneWidget);
+        await tester.tap(find.text('Вернуть'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Возвращено: 4 платежа, 2 оплаты'), findsOneWidget);
+        expectSameData(await BackupRepository(db).readAll(), sampleData());
+      },
+      today: today,
+      seed: seedSample,
+      files: h2,
+    );
+
+    final h3 = FakeFileGateway();
+    h3.pickText(otherBackup());
+    appTest(
+      '«Отмена» в диалоге возврата данных не меняет',
+      (tester, db) async {
+        await openSettings(tester);
+        await tester.tap(find.text('Восстановить из копии'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Выбрать файл'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Вернуть данные до восстановления'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Отмена'));
+        await tester.pumpAndSettle();
+
+        expect(
+          (await BackupRepository(db).readAll()).payments.single.name,
+          'Кинопоиск',
+        );
+      },
+      today: today,
+      seed: seedSample,
+      files: h3,
+    );
+  });
 }
