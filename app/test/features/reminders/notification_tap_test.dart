@@ -31,7 +31,7 @@ void main() {
     (tester, db) async {
       expect(formTitle, findsNothing);
 
-      s1.taps.add(1);
+      s1.tap(1);
       await tester.pumpAndSettle();
 
       expect(formTitle, findsOneWidget);
@@ -60,7 +60,7 @@ void main() {
   appTest(
     'платёж из уведомления уже удалён: сообщение вместо формы',
     (tester, db) async {
-      s3.taps.add(99);
+      s3.tap(99);
       await tester.pumpAndSettle();
 
       expect(formTitle, findsNothing);
@@ -77,7 +77,7 @@ void main() {
     (tester, db) async {
       await openTab(tester, 'Настройки');
 
-      s4.taps.add(1);
+      s4.tap(1);
       await tester.pumpAndSettle();
       expect(formTitle, findsOneWidget);
 

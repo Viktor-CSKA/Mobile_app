@@ -47,6 +47,9 @@ const _monthsNominative = [
 String formatMonthYear(DateTime d) =>
     '${_monthsNominative[d.month - 1]} ${d.year}';
 
+/// Название месяца по номеру 1..12: `10` → `Октябрь`.
+String monthNameRu(int month) => _monthsNominative[month - 1];
+
 /// Дни недели с понедельника.
 const weekdaysShortRu = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 

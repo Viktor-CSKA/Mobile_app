@@ -10,7 +10,7 @@ import '../../payments/domain/payment_draft.dart';
 import '../../payments/presentation/payment_form_screen.dart';
 import '../../payments/presentation/payment_labels.dart';
 import '../domain/upcoming_summary.dart';
-import 'pay_dialog.dart';
+import 'pay_flow.dart';
 import 'upcoming_labels.dart';
 
 class UpcomingScreen extends ConsumerWidget {
@@ -20,47 +20,7 @@ class UpcomingScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     PaymentWithCategory item,
-  ) async {
-    final amount = await showPayDialog(context, item);
-    if (amount == null || !context.mounted) return;
-    final repo = ref.read(paymentsRepositoryProvider);
-    final result = await repo.markPaid(item.payment.id, amountKopecks: amount);
-    if (!context.mounted) return;
-    final name = item.payment.name;
-    final next = result.nextDue;
-    final text = next == null
-        ? '«$name» оплачен. Платёж завершён.'
-        : '«$name» оплачен. Следующий: ${formatDayMonthShort(next)}.';
-    final messenger = ScaffoldMessenger.of(context);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(text),
-          duration: const Duration(seconds: 8),
-          // Со кнопкой снэкбар по умолчанию не исчезает сам и закрывал бы
-          // содержимое экрана; отмена нужна только на несколько секунд.
-          persist: false,
-          action: SnackBarAction(
-            label: 'Отменить',
-            onPressed: () async {
-              final ok = await repo.undoPaid(result);
-              messenger
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      ok
-                          ? 'Оплата «$name» отменена'
-                          : 'Отменить не получилось: платёж уже изменён',
-                    ),
-                  ),
-                );
-            },
-          ),
-        ),
-      );
-  }
+  ) => payPayment(context, ref, item);
 
   void _edit(BuildContext context, int paymentId) {
     Navigator.of(context).push(

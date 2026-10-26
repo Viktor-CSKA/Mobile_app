@@ -97,6 +97,21 @@ class PaymentsRepository {
     )..orderBy([(c) => OrderingTerm.asc(c.id)])).watch();
   }
 
+  /// Платёж вместе с категорией; null, если платежа нет.
+  Future<PaymentWithCategory?> getWithCategory(int id) async {
+    final row = await (_db.select(_db.payments).join([
+      innerJoin(
+        _db.categories,
+        _db.categories.id.equalsExp(_db.payments.categoryId),
+      ),
+    ])..where(_db.payments.id.equals(id))).getSingleOrNull();
+    if (row == null) return null;
+    return PaymentWithCategory(
+      row.readTable(_db.payments),
+      row.readTable(_db.categories),
+    );
+  }
+
   Future<Payment?> getById(int id) {
     return (_db.select(
       _db.payments,

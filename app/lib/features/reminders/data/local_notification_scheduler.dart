@@ -21,7 +21,31 @@ class LocalNotificationScheduler implements NotificationScheduler {
     description: 'Напоминания о приближающихся платежах и подписках',
     importance: Importance.high,
   );
+
+  /// Идентификатор кнопки «Оплачено» на напоминании.
+  static const _paidActionId = 'paid';
+
+  /// Напоминание о платеже: с кнопкой «Оплачено». Кнопка открывает
+  /// приложение (там и отмечается оплата, с возможностью отмены).
   static const _details = NotificationDetails(
+    android: AndroidNotificationDetails(
+      _channelId,
+      'Напоминания о платежах',
+      channelDescription: 'Напоминания о приближающихся платежах и подписках',
+      importance: Importance.high,
+      priority: Priority.high,
+      actions: [
+        AndroidNotificationAction(
+          _paidActionId,
+          'Оплачено',
+          showsUserInterface: true,
+        ),
+      ],
+    ),
+  );
+
+  /// Тестовое уведомление: без кнопки, платежа у него нет.
+  static const _testDetails = NotificationDetails(
     android: AndroidNotificationDetails(
       _channelId,
       'Напоминания о платежах',
@@ -44,15 +68,18 @@ class LocalNotificationScheduler implements NotificationScheduler {
 
   Future<void> _ensureInit() => _init ??= _initialize();
 
-  final _taps = StreamController<int>.broadcast();
+  final _taps = StreamController<ReminderTap>.broadcast();
 
   @override
-  Stream<int> get tappedPayments => _taps.stream;
+  Stream<ReminderTap> get tappedPayments => _taps.stream;
 
-  /// Идентификатор платежа из данных уведомления; у тестового уведомления
-  /// данных нет, и оно игнорируется.
-  static int? _paymentIdOf(String? payload) =>
-      payload == null ? null : int.tryParse(payload);
+  /// Нажатие на напоминание по данным ответа. У тестового уведомления данных
+  /// платежа нет, и оно игнорируется.
+  static ReminderTap? _tapOf(NotificationResponse? response) =>
+      parseReminderPayload(
+        response?.payload,
+        markPaid: response?.actionId == _paidActionId,
+      );
 
   Future<void> _initialize() async {
     await _plugin.initialize(
@@ -60,19 +87,19 @@ class LocalNotificationScheduler implements NotificationScheduler {
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       ),
       onDidReceiveNotificationResponse: (response) {
-        final id = _paymentIdOf(response.payload);
-        if (id != null) _taps.add(id);
+        final tap = _tapOf(response);
+        if (tap != null) _taps.add(tap);
       },
     );
     await _android?.createNotificationChannel(_channel);
   }
 
   @override
-  Future<int?> launchedByPayment() async {
+  Future<ReminderTap?> launchedByPayment() async {
     await _ensureInit();
     final details = await _plugin.getNotificationAppLaunchDetails();
     if (details == null || !details.didNotificationLaunchApp) return null;
-    return _paymentIdOf(details.notificationResponse?.payload);
+    return _tapOf(details.notificationResponse);
   }
 
   Future<AndroidScheduleMode> _mode() async {
@@ -87,12 +114,13 @@ class LocalNotificationScheduler implements NotificationScheduler {
     required DateTime fireAt,
     required String title,
     required String body,
+    required NotificationDetails details,
     String? payload,
   }) async {
     await _plugin.zonedSchedule(
       id: id,
       scheduledDate: tz.TZDateTime.from(fireAt, tz.UTC),
-      notificationDetails: _details,
+      notificationDetails: details,
       androidScheduleMode: await _mode(),
       title: title,
       body: body,
@@ -110,7 +138,8 @@ class LocalNotificationScheduler implements NotificationScheduler {
         fireAt: r.fireAt,
         title: r.title,
         body: r.body,
-        payload: '${r.paymentId}',
+        details: _details,
+        payload: reminderPayload(r.paymentId, r.dueDate),
       );
     }
   }
@@ -157,6 +186,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
       fireAt: DateTime.now().add(after),
       title: title,
       body: body,
+      details: _testDetails,
     );
   }
 }

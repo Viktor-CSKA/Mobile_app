@@ -25,17 +25,30 @@ class FakeNotificationScheduler implements NotificationScheduler {
   /// Если true — replaceAll бросает ошибку.
   bool failReplace = false;
 
-  /// Нажатия на уведомления во время работы приложения: `taps.add(paymentId)`.
-  final StreamController<int> taps = StreamController<int>.broadcast();
+  /// Нажатия на уведомления во время работы приложения: [tap] и [tapPaid].
+  final StreamController<ReminderTap> taps =
+      StreamController<ReminderTap>.broadcast();
 
-  /// Платёж, по уведомлению о котором «запущено» приложение (null — обычный запуск).
+  /// Нажатие на само напоминание о платеже [paymentId].
+  void tap(int paymentId, {DateTime? due}) =>
+      taps.add(ReminderTap(paymentId, dueDate: due));
+
+  /// Нажатие на кнопку «Оплачено» у напоминания.
+  void tapPaid(int paymentId, {DateTime? due}) =>
+      taps.add(ReminderTap(paymentId, markPaid: true, dueDate: due));
+
+  /// Платёж, по уведомлению о котором «запущено» приложение (null — обычный
+  /// запуск), и была ли нажата кнопка «Оплачено».
   int? launchPaymentId;
+  bool launchMarkPaid = false;
 
   @override
-  Stream<int> get tappedPayments => taps.stream;
+  Stream<ReminderTap> get tappedPayments => taps.stream;
 
   @override
-  Future<int?> launchedByPayment() async => launchPaymentId;
+  Future<ReminderTap?> launchedByPayment() async => launchPaymentId == null
+      ? null
+      : ReminderTap(launchPaymentId!, markPaid: launchMarkPaid);
 
   List<PlannedReminder> get lastPlan =>
       replaceCalls.isEmpty ? const [] : replaceCalls.last;

@@ -13,9 +13,14 @@ class PaymentTemplate {
     this.yearlyMonth,
     this.yearlyDay,
     this.popular = false,
+    this.amountKopecks,
   });
 
   final String name;
+
+  /// Сумма в копейках. У готовых шаблонов не задана (тарифы меняются); у
+  /// шаблонов пользователя («запомнить как шаблон») — его собственная сумма.
+  final int? amountKopecks;
 
   /// Название категории из стандартного набора (связь по названию, а не по
   /// номеру: после восстановления из копии номера могут отличаться).
@@ -76,11 +81,18 @@ String _norm(String s) => s.toLowerCase().replaceAll('ё', 'е').trim();
 
 /// Шаблоны, подходящие под запрос: по названию или категории, без учёта
 /// регистра и различия «е/ё». Пустой запрос возвращает всё.
-List<PaymentTemplate> searchTemplates(String query) {
+List<PaymentTemplate> searchTemplates(String query) =>
+    searchIn(paymentTemplates, query);
+
+/// То же среди произвольных шаблонов (например, пользовательских).
+List<PaymentTemplate> searchIn(
+  Iterable<PaymentTemplate> templates,
+  String query,
+) {
   final q = _norm(query);
-  if (q.isEmpty) return paymentTemplates;
+  if (q.isEmpty) return templates.toList();
   return [
-    for (final t in paymentTemplates)
+    for (final t in templates)
       if (_norm(t.name).contains(q) || _norm(t.categoryName).contains(q)) t,
   ];
 }

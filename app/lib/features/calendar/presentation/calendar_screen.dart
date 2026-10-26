@@ -7,6 +7,7 @@ import '../../../core/format/money.dart';
 import '../../payments/data/payments_providers.dart';
 import '../../payments/domain/payment_schedule.dart';
 import '../../payments/presentation/payment_form_screen.dart';
+import '../../stats/presentation/stats_screen.dart';
 import '../../upcoming/presentation/upcoming_labels.dart';
 import '../data/calendar_providers.dart';
 import '../domain/month_calendar.dart';
@@ -101,7 +102,18 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Календарь')),
+      appBar: AppBar(
+        title: const Text('Календарь'),
+        actions: [
+          IconButton(
+            tooltip: 'Статистика за год',
+            icon: const Icon(Icons.bar_chart),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const StatsScreen()),
+            ),
+          ),
+        ],
+      ),
       body: body,
     );
   }

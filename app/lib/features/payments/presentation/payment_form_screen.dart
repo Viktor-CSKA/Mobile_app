@@ -7,6 +7,7 @@ import '../../../core/format/date_format_ru.dart';
 import '../../../core/format/money.dart';
 import '../../reminders/data/reminder_providers.dart';
 import '../data/payments_providers.dart';
+import '../data/user_templates_providers.dart';
 import '../domain/payment_draft.dart';
 import '../domain/payment_schedule.dart';
 import '../domain/payment_templates.dart';
@@ -108,15 +109,54 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
       _remindDays = t.remindDaysBefore;
       _variableAmount = t.variableAmount;
       if (t.variableAmount) _amount.clear();
+      // У шаблона пользователя есть своя сумма; у готовых её нет.
+      if (!t.variableAmount && t.amountKopecks != null) {
+        _amount.text = _kopecksToInput(t.amountKopecks!);
+      }
       if (due != null) _nextDue = due;
     });
-    if (!t.variableAmount) {
+    if (!t.variableAmount && t.amountKopecks == null) {
       // Поле суммы могло только что появиться (если было «сумма меняется»),
       // поэтому фокус просим после перестроения.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _amountFocus.requestFocus();
       });
     }
+  }
+
+  /// Запоминает заполненную форму как шаблон: потом платёж создаётся одним
+  /// нажатием. Дата в шаблон не входит, кроме дня месяца.
+  Future<void> _saveAsTemplate(List<Category> categories) async {
+    if (!_formKey.currentState!.validate()) return;
+    final categoryId = _categoryId;
+    if (categoryId == null) return;
+    final category = categories.where((c) => c.id == categoryId).firstOrNull;
+    if (category == null) return;
+
+    final name = _name.text.trim();
+    await ref
+        .read(userTemplatesProvider.notifier)
+        .add(
+          PaymentTemplate(
+            name,
+            category.name,
+            periodMonths: _periodMonths,
+            variableAmount: _variableAmount,
+            amountKopecks: _variableAmount ? null : parseRubles(_amount.text),
+            remindDaysBefore: _remindDays,
+            dayOfMonth: _nextDue.day,
+          ),
+        );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            'Шаблон «$name» сохранён: его можно выбрать в новом платеже',
+          ),
+        ),
+      );
   }
 
   Future<void> _pickTemplate(List<Category> categories) async {
@@ -242,6 +282,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(categoriesProvider).value ?? const [];
+    final myTemplates = ref.watch(userTemplatesProvider);
     final selectedCategory =
         _categoryId ?? (categories.isEmpty ? null : categories.first.id);
     if (_categoryId == null && selectedCategory != null && !_isEdit) {
@@ -253,6 +294,12 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
       appBar: AppBar(
         title: Text(_isEdit ? 'Платёж' : 'Новый платёж'),
         actions: [
+          if (!_loading)
+            IconButton(
+              tooltip: 'Запомнить как шаблон',
+              icon: const Icon(Icons.bookmark_add_outlined),
+              onPressed: () => _saveAsTemplate(categories),
+            ),
           if (_isEdit && _isActive && !_loading)
             IconButton(
               tooltip: 'В архив',
@@ -300,6 +347,14 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                               label: const Text('Все шаблоны'),
                               onPressed: () => _pickTemplate(categories),
                             ),
+                            for (final t in myTemplates.take(5)) ...[
+                              const SizedBox(width: 8),
+                              ActionChip(
+                                avatar: const Icon(Icons.bookmark, size: 18),
+                                label: Text(t.name),
+                                onPressed: () => _applyTemplate(t, categories),
+                              ),
+                            ],
                             for (final t in popularTemplates) ...[
                               const SizedBox(width: 8),
                               ActionChip(
