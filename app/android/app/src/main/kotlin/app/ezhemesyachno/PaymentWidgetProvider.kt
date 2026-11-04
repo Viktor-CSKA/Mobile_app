@@ -121,7 +121,12 @@ class PaymentWidgetProvider : AppWidgetProvider() {
             views.setViewVisibility(rowId, View.VISIBLE)
             views.setTextViewText(nameId, payment.optString("name", ""))
             views.setTextViewText(dueId, payment.optString("dueLabel", ""))
-            val amount = payment.optString("amountLabel", "")
+            // JSON null (переменная сумма) optString превращает в "null".
+            val amount = if (payment.isNull("amountLabel")) {
+                ""
+            } else {
+                payment.optString("amountLabel", "")
+            }
             views.setTextViewText(amountId, if (amount.isEmpty()) "сумма меняется" else amount)
 
             val colorHex = payment.optString("colorHex", "")
