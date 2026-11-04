@@ -1,7 +1,7 @@
 import 'package:ezhemesyachno/core/database/app_database.dart';
 import 'package:ezhemesyachno/features/payments/domain/payment_draft.dart';
 import 'package:ezhemesyachno/features/upcoming/domain/upcoming_summary.dart';
-import 'package:ezhemesyachno/features/upcoming/presentation/upcoming_labels.dart';
+import 'package:ezhemesyachno/features/upcoming/domain/upcoming_labels.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _category = Category(id: 1, name: 'Подписки', colorValue: 0xFF8E24AA);

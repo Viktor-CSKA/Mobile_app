@@ -6,6 +6,7 @@ import 'core/clock.dart';
 import 'core/theme/app_theme.dart';
 import 'features/reminders/data/reminder_providers.dart';
 import 'features/settings/data/theme_providers.dart';
+import 'features/widget/data/widget_providers.dart';
 import 'home_shell.dart';
 
 class EzhemesyachnoApp extends ConsumerStatefulWidget {
@@ -37,6 +38,7 @@ class _EzhemesyachnoAppState extends ConsumerState<EzhemesyachnoApp>
       ref.invalidate(todayProvider);
       ref.invalidate(nowProvider);
       ref.invalidate(reminderSyncProvider); // пересоздание = новый пересчёт
+      ref.invalidate(widgetSyncProvider); // пересчёт «сегодня» в виджете
     }
   }
 
@@ -44,6 +46,8 @@ class _EzhemesyachnoAppState extends ConsumerState<EzhemesyachnoApp>
   Widget build(BuildContext context) {
     // Держим напоминания в соответствии с платежами и настройками.
     ref.watch(reminderSyncProvider);
+    // Обновляем виджет при изменении платежей.
+    ref.watch(widgetSyncProvider);
 
     return MaterialApp(
       title: 'Ежемесячно',

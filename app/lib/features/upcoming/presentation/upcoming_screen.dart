@@ -9,9 +9,9 @@ import '../../payments/data/payments_providers.dart';
 import '../../payments/domain/payment_draft.dart';
 import '../../payments/presentation/payment_form_screen.dart';
 import '../../payments/presentation/payment_labels.dart';
+import '../domain/upcoming_labels.dart';
 import '../domain/upcoming_summary.dart';
 import 'pay_flow.dart';
-import 'upcoming_labels.dart';
 
 class UpcomingScreen extends ConsumerWidget {
   const UpcomingScreen({super.key});

@@ -5,6 +5,7 @@ import 'package:ezhemesyachno/core/database/app_database.dart';
 import 'package:ezhemesyachno/core/database/database_provider.dart';
 import 'package:ezhemesyachno/features/backup/data/backup_providers.dart';
 import 'package:ezhemesyachno/features/reminders/data/reminder_providers.dart';
+import 'package:ezhemesyachno/features/widget/data/widget_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'fake_file_gateway.dart';
 import 'fake_safety_store.dart';
 import 'fake_scheduler.dart';
+import 'fake_widget.dart';
 
 /// Виджет-тест приложения с базой в памяти (вместо файла на устройстве).
 ///
@@ -35,6 +37,8 @@ void appTest(
   FakeNotificationScheduler? scheduler,
   FakeFileGateway? files,
   FakeSafetyBackupStore? safety,
+  FakeWidgetCacheWriter? widgetCacheWriter,
+  FakeWidgetRefresh? widgetRefresh,
   Map<String, Object> prefs = const {},
 }) {
   testWidgets(description, (tester) async {
@@ -71,6 +75,13 @@ void appTest(
           fileGatewayProvider.overrideWithValue(files ?? FakeFileGateway()),
           safetyBackupStoreProvider.overrideWithValue(
             safety ?? FakeSafetyBackupStore(),
+          ),
+          // Виджет: иначе реальный path_provider и канал упадут в тесте.
+          widgetCacheWriterProvider.overrideWithValue(
+            widgetCacheWriter ?? FakeWidgetCacheWriter(),
+          ),
+          widgetRefreshProvider.overrideWithValue(
+            widgetRefresh ?? FakeWidgetRefresh(),
           ),
           if (today != null) todayProvider.overrideWithValue(today),
           if (fakeNow != null) nowProvider.overrideWithValue(fakeNow),

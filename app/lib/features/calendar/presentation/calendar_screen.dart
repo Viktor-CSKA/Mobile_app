@@ -8,7 +8,7 @@ import '../../payments/data/payments_providers.dart';
 import '../../payments/domain/payment_schedule.dart';
 import '../../payments/presentation/payment_form_screen.dart';
 import '../../stats/presentation/stats_screen.dart';
-import '../../upcoming/presentation/upcoming_labels.dart';
+import '../../upcoming/domain/upcoming_labels.dart';
 import '../data/calendar_providers.dart';
 import '../domain/month_calendar.dart';
 
