@@ -5,6 +5,9 @@ import '../../../core/clock.dart';
 import '../../../core/format/date_format_ru.dart';
 import '../../../core/format/money.dart';
 import '../../../core/format/plural_ru.dart';
+import '../../../core/widgets/month_progress_ring.dart';
+import '../../../home_shell.dart';
+import '../../calendar/data/calendar_providers.dart';
 import '../../payments/data/payments_providers.dart';
 import '../../payments/domain/payment_draft.dart';
 import '../../payments/presentation/payment_form_screen.dart';
@@ -34,6 +37,9 @@ class UpcomingScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final today = ref.watch(todayProvider);
     final payments = ref.watch(activePaymentsProvider);
+    final paidThisMonth = ref.watch(
+      paidInMonthProvider(DateTime(today.year, today.month)),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Ближайшие')),
@@ -44,10 +50,16 @@ class UpcomingScreen extends ConsumerWidget {
         data: (items) {
           final summary = UpcomingSummary.build(items, today);
           if (summary.isEmpty) return const _EmptyState();
+          // Оплачено в этом месяце — для кольца прогресса. Общий размер месяца =
+          // оплаченное + оставшееся к оплате (с учётом просрочки).
+          final paidKopecks = (paidThisMonth.value ?? const []).fold<int>(
+            0,
+            (sum, e) => sum + e.record.amountKopecks,
+          );
           return ListView(
             padding: const EdgeInsets.only(bottom: 24),
             children: [
-              _SummaryCard(summary: summary),
+              _SummaryCard(summary: summary, paidKopecks: paidKopecks),
               if (summary.overdue.isNotEmpty) ...[
                 const _SectionHeader('Просрочено', isAlert: true),
                 for (final item in summary.overdue)
@@ -81,12 +93,40 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    final theme = Theme.of(context);
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Text(
-          'Платежей пока нет.\nДобавьте первый на вкладке «Платежи».',
-          textAlign: TextAlign.center,
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.event_note_outlined,
+              size: 72,
+              color: theme.colorScheme.primary.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Платежей пока нет',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Добавьте первый платёж: подписку, ЖКХ или кредит —\n'
+              'и увидите, сколько платить в этом месяце',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: () => HomeShell.goToTab(context, 2),
+              icon: const Icon(Icons.add),
+              label: const Text('Добавить платёж'),
+            ),
+          ],
         ),
       ),
     );
@@ -94,15 +134,21 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.summary});
+  const _SummaryCard({required this.summary, required this.paidKopecks});
 
   final UpcomingSummary summary;
+
+  /// Уже оплачено в этом месяце — для кольца прогресса.
+  final int paidKopecks;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final need = summary.needThisMonth;
     final overdue = summary.overdueForecast;
+
+    // Общий размер месяца = оплаченное + оставшееся к оплате (с просрочкой).
+    final totalMonth = paidKopecks + need.totalKopecks;
 
     final details = <String>[
       if (need.paymentsCount == 0)
@@ -121,13 +167,32 @@ class _SummaryCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Нужно в этом месяце', style: theme.textTheme.labelLarge),
-            const SizedBox(height: 4),
-            Text(
-              formatKopecks(need.totalKopecks),
-              style: theme.textTheme.headlineMedium,
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                MonthProgressRing(
+                  paidKopecks: paidKopecks,
+                  totalKopecks: totalMonth,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        formatKopecks(need.totalKopecks),
+                        style: theme.textTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        details.join(' · '),
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(details.join(' · '), style: theme.textTheme.bodyMedium),
             if (overdue.paymentsCount > 0) ...[
               const SizedBox(height: 8),
               Text(
@@ -186,21 +251,36 @@ class _UpcomingTile extends StatelessWidget {
     final days = item.schedule.daysUntilDue(today);
     final overdue = days < 0;
     final amount = p.amountKopecks;
+    // Цвет срочности: просрочка — ошибка, близкие даты — акцент, остальное — нейтрально.
+    final urgency = _urgencyColor(theme, days);
 
     return ListTile(
       onTap: onTap,
-      leading: CircleAvatar(
-        backgroundColor: Color(item.category.colorValue),
-        child: Text(
-          p.name.characters.first.toUpperCase(),
-          style: const TextStyle(color: Colors.white),
+      leading: Container(
+        // Кольцо срочности вокруг аватара категории.
+        decoration: urgency == null
+            ? null
+            : BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: urgency, width: 2.5),
+              ),
+        padding: urgency == null ? null : const EdgeInsets.all(3),
+        child: CircleAvatar(
+          backgroundColor: Color(item.category.colorValue),
+          child: Text(
+            p.name.characters.first.toUpperCase(),
+            style: const TextStyle(color: Colors.white),
+          ),
         ),
       ),
       title: Text(p.name),
       subtitle: Text(
         '${dueLabel(days)} · ${formatDayMonthShort(p.nextDueAt)} · '
         '${periodLabel(p.periodMonths)}',
-        style: overdue ? TextStyle(color: theme.colorScheme.error) : null,
+        style: TextStyle(
+          color: urgency ?? theme.colorScheme.onSurfaceVariant,
+          fontWeight: overdue ? FontWeight.w600 : null,
+        ),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -217,5 +297,13 @@ class _UpcomingTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Цвет срочности по остатку дней; null — нейтральный (без выделения).
+  Color? _urgencyColor(ThemeData theme, int days) {
+    if (days < 0) return theme.colorScheme.error;
+    if (days <= 2) return theme.colorScheme.tertiary;
+    if (days <= 6) return theme.colorScheme.secondary;
+    return null;
   }
 }

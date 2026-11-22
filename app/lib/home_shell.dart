@@ -17,6 +17,16 @@ import 'features/upcoming/presentation/upcoming_screen.dart';
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
+  /// Доступ вкладок к навигации: пустые состояния ведут к действию
+  /// («Добавить первый платёж» → вкладка «Платежи»). Ключ один на приложение.
+  static final shellKey = GlobalKey<_HomeShellState>();
+
+  /// Переключает нижнюю навигацию на вкладку [index].
+  static void goToTab(BuildContext context, int index) {
+    final shell = shellKey.currentState;
+    if (shell != null && shell.mounted) shell._select(index);
+  }
+
   @override
   ConsumerState<HomeShell> createState() => _HomeShellState();
 }
@@ -55,6 +65,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     _taps?.cancel();
     super.dispose();
   }
+
+  void _select(int index) => setState(() => _index = index);
 
   void _say(String text) {
     ScaffoldMessenger.of(context)
@@ -100,6 +112,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: HomeShell.shellKey,
       body: IndexedStack(index: _index, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,

@@ -367,6 +367,10 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
+                    const _FormHeader(
+                      icon: Icons.badge_outlined,
+                      title: 'Что платить',
+                    ),
                     TextFormField(
                       controller: _name,
                       textCapitalization: TextCapitalization.sentences,
@@ -396,6 +400,10 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                       validator: (v) => v == null ? 'Выберите категорию' : null,
                     ),
                     const SizedBox(height: 12),
+                    const _FormHeader(
+                      icon: Icons.payments_outlined,
+                      title: 'Сколько и когда',
+                    ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Сумма меняется'),
@@ -446,6 +454,11 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                           setState(() => _nextDue = dateOnly(picked));
                         }
                       },
+                    ),
+                    const SizedBox(height: 12),
+                    const _FormHeader(
+                      icon: Icons.notifications_active_outlined,
+                      title: 'Напоминание',
                     ),
                     DropdownButtonFormField<int>(
                       initialValue: _remindDays,
@@ -557,4 +570,34 @@ String _kopecksToInput(int kopecks) {
   final rubles = kopecks ~/ 100;
   final cents = kopecks % 100;
   return cents == 0 ? '$rubles' : '$rubles,${cents.toString().padLeft(2, '0')}';
+}
+
+/// Заголовок секции формы: иконка + название логического блока.
+/// Длинная форма читается как последовательность смысловых групп.
+class _FormHeader extends StatelessWidget {
+  const _FormHeader({required this.icon, required this.title});
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
