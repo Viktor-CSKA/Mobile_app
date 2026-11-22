@@ -18,9 +18,32 @@ Future<void> payPayment(
   bool askKnownAmount = true,
 }) async {
   final known = item.payment.amountKopecks;
-  final int? amount = (!askKnownAmount && known != null)
-      ? known
+  final dialog = (!askKnownAmount && known != null)
+      ? PayDialogResult(amount: known)
       : await showPayDialog(context, item);
+  if (!context.mounted) return;
+
+  // «Пропустить период»: дата сдвигается вперёд без записи в историю.
+  if (dialog.skip) {
+    final repo = ref.read(paymentsRepositoryProvider);
+    final ok = await repo.skipPeriod(item.payment.id);
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? 'Период «${item.payment.name}» пропущен'
+                : 'Не получилось пропустить: платёж уже завершён',
+          ),
+        ),
+      );
+    return;
+  }
+
+  final amount = dialog.amount;
   if (amount == null || !context.mounted) return;
 
   final repo = ref.read(paymentsRepositoryProvider);

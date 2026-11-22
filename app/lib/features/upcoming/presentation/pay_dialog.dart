@@ -3,14 +3,28 @@ import 'package:flutter/material.dart';
 import '../../../core/format/money.dart';
 import '../../payments/domain/payment_draft.dart';
 
-/// Спрашивает фактически оплаченную сумму. Возвращает копейки или null (отмена).
-///
+/// Спрашивает фактически оплаченную сумму. Возвращает сумму либо пропуск
+/// периода. Отмена (null из диалога) превращается в пустой результат.
 /// Поле заполнено обычной суммой платежа; для платежа с переменной суммой пусто.
-Future<int?> showPayDialog(BuildContext context, PaymentWithCategory item) {
-  return showDialog<int>(
+Future<PayDialogResult> showPayDialog(
+  BuildContext context,
+  PaymentWithCategory item,
+) async {
+  final result = await showDialog<PayDialogResult>(
     context: context,
     builder: (_) => _PayDialog(item: item),
   );
+  return result ?? const PayDialogResult();
+}
+
+class PayDialogResult {
+  const PayDialogResult({this.amount, this.skip = false});
+
+  /// Оплачиваемая сумма в копейках; null без [skip] — отмена.
+  final int? amount;
+
+  /// true — пользователь выбрал «Пропустить период».
+  final bool skip;
 }
 
 class _PayDialog extends StatefulWidget {
@@ -41,7 +55,12 @@ class _PayDialogState extends State<_PayDialog> {
 
   void _confirm() {
     if (!_formKey.currentState!.validate()) return;
-    Navigator.of(context).pop(parseRubles(_amount.text));
+    Navigator.of(context)
+        .pop(PayDialogResult(amount: parseRubles(_amount.text)));
+  }
+
+  void _skip() {
+    Navigator.of(context).pop(const PayDialogResult(skip: true));
   }
 
   @override
@@ -84,6 +103,7 @@ class _PayDialogState extends State<_PayDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Отмена'),
         ),
+        TextButton(onPressed: _skip, child: const Text('Пропустить')),
         FilledButton(onPressed: _confirm, child: const Text('Оплачено')),
       ],
     );

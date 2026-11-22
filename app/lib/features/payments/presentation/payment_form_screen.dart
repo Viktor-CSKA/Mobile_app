@@ -16,10 +16,15 @@ import 'payment_labels.dart';
 import 'template_picker.dart';
 
 /// Экран добавления (когда [paymentId] == null) или редактирования платежа.
+/// Для дублирования передают [initialDraft] без [paymentId]: форма открыта
+/// как «новый платёж», но поля заполнены копируемым платежом.
 class PaymentFormScreen extends ConsumerStatefulWidget {
-  const PaymentFormScreen({super.key, this.paymentId});
+  const PaymentFormScreen({super.key, this.paymentId, this.initialDraft});
 
   final int? paymentId;
+
+  /// Предзаполнение для нового платежа (дублирование существующего).
+  final PaymentDraft? initialDraft;
 
   @override
   ConsumerState<PaymentFormScreen> createState() => _PaymentFormScreenState();
@@ -53,7 +58,22 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
   @override
   void initState() {
     super.initState();
-    _nextDue = dateOnly(ref.read(todayProvider));
+    final initial = widget.initialDraft;
+    if (initial != null) {
+      _name.text = initial.name;
+      _note.text = initial.note;
+      _categoryId = initial.categoryId;
+      _variableAmount = initial.amountKopecks == null;
+      if (initial.amountKopecks != null) {
+        _amount.text = _kopecksToInput(initial.amountKopecks!);
+      }
+      _periodMonths = initial.periodMonths;
+      _remindDays = initial.remindDaysBefore;
+      _nextDue = dateOnly(initial.nextDueAt);
+      _endsAt = initial.endsAt == null ? null : dateOnly(initial.endsAt!);
+    } else {
+      _nextDue = dateOnly(ref.read(todayProvider));
+    }
     if (_isEdit) {
       _loading = true;
       _load();
@@ -223,6 +243,26 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
     }
   }
 
+  /// Открывает форму нового платежа, предзаполнив её текущими значениями:
+  /// удобно для похожего платежа (дата остаётся редактируемой).
+  void _duplicate() {
+    final draft = PaymentDraft(
+      name: _name.text,
+      categoryId: _categoryId ?? 0,
+      amountKopecks: _variableAmount ? null : parseRubles(_amount.text),
+      periodMonths: _periodMonths,
+      nextDueAt: _nextDue,
+      remindDaysBefore: _remindDays,
+      endsAt: _endsAt,
+      note: _note.text,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute<bool>(
+        builder: (_) => PaymentFormScreen(initialDraft: draft),
+      ),
+    );
+  }
+
   /// Убирает платёж в архив: история остаётся, из «Ближайших», календаря и
   /// напоминаний он пропадает.
   Future<void> _archive() async {
@@ -299,6 +339,12 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
               tooltip: 'Запомнить как шаблон',
               icon: const Icon(Icons.bookmark_add_outlined),
               onPressed: () => _saveAsTemplate(categories),
+            ),
+          if (_isEdit && _isActive && !_loading)
+            IconButton(
+              tooltip: 'Дублировать',
+              icon: const Icon(Icons.copy_outlined),
+              onPressed: _duplicate,
             ),
           if (_isEdit && _isActive && !_loading)
             IconButton(

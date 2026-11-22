@@ -10,6 +10,7 @@ import '../../../home_shell.dart';
 import '../../calendar/data/calendar_providers.dart';
 import '../../payments/data/payments_providers.dart';
 import '../../payments/domain/payment_draft.dart';
+import '../../payments/domain/payment_schedule.dart';
 import '../../payments/presentation/payment_form_screen.dart';
 import '../../payments/presentation/payment_labels.dart';
 import '../domain/upcoming_labels.dart';
@@ -24,6 +25,38 @@ class UpcomingScreen extends ConsumerWidget {
     WidgetRef ref,
     PaymentWithCategory item,
   ) => payPayment(context, ref, item);
+
+  /// Отмечает оплаченными все платежи до выбранной даты (кнопка в AppBar).
+  /// Платежи с переменной суммой пропускаются — их отмечают вручную.
+  Future<void> _payUntilDate(BuildContext context, WidgetRef ref) async {
+    final today = ref.read(todayProvider);
+    final now = dateOnly(today);
+    final endOfMonth = DateTime(
+      now.year,
+      now.month,
+      daysInMonth(now.year, now.month),
+    );
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: endOfMonth,
+      firstDate: now,
+      lastDate: DateTime(now.year + 2),
+    );
+    if (picked == null || !context.mounted) return;
+
+    final repo = ref.read(paymentsRepositoryProvider);
+    final (marked, skipped) = await repo.markPaidUntil(picked, today);
+    if (!context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final text = skipped == 0
+        ? 'Отмечено оплаченными: ${paymentsCountLabel(marked)}'
+        : 'Отмечено: ${paymentsCountLabel(marked)}. '
+              'Пропущено с переменной суммой: $skipped — отметьте их вручную';
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
+  }
 
   void _edit(BuildContext context, int paymentId) {
     Navigator.of(context).push(
@@ -42,7 +75,28 @@ class UpcomingScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ближайшие')),
+      appBar: AppBar(
+        title: const Text('Ближайшие'),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Ещё',
+            icon: const Icon(Icons.more_vert),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'pay_until',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.done_all_outlined),
+                  title: Text('Оплатить всё до даты'),
+                ),
+              ),
+            ],
+            onSelected: (value) {
+              if (value == 'pay_until') _payUntilDate(context, ref);
+            },
+          ),
+        ],
+      ),
       body: payments.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) =>

@@ -118,6 +118,66 @@ class PaymentsRepository {
     )..where((p) => p.id.equals(id))).getSingleOrNull();
   }
 
+  /// Создаёт копию платежа со следующей датой (на период позже ближайшей).
+  /// Нужно для повтора платежа (например, разовой подписки): дата сдвигается,
+  /// чтобы копия не совпала с оригиналом. Возвращает id новой записи.
+  Future<int> duplicate(int id) async {
+    final payment = await getById(id);
+    if (payment == null) throw StateError('Платёж $id не найден');
+    final next = payment.schedule.followingDue() ?? payment.nextDueAt;
+    return add(
+      PaymentDraft(
+        name: payment.name,
+        categoryId: payment.categoryId,
+        amountKopecks: payment.amountKopecks,
+        periodMonths: payment.periodMonths,
+        nextDueAt: dateOnly(next),
+        remindDaysBefore: payment.remindDaysBefore,
+        endsAt: payment.endsAt,
+        note: payment.note,
+      ),
+    );
+  }
+
+  /// Пропускает ближайший платёж без отметки об оплате: дата сдвигается на
+  /// период вперёд (отпуск, разовая отмена). История не пишется. Если платёж
+  /// закончился, возвращает false и ничего не меняет.
+  Future<bool> skipPeriod(int id) async {
+    final payment = await getById(id);
+    if (payment == null) throw StateError('Платёж $id не найден');
+    final next = payment.schedule.followingDue();
+    if (next == null) return false;
+    await (_db.update(_db.payments)..where((p) => p.id.equals(id))).write(
+      PaymentsCompanion(nextDueAt: Value(dateOnly(next))),
+    );
+    return true;
+  }
+
+  /// Отмечает оплаченными все активные платежи с датой до [through]
+  /// включительно и известной суммой (оплата — сегодняшним числом [today]).
+  /// Платежи с переменной суммой пропускаются: их сумма заранее неизвестна,
+  /// их нужно отметить вручную. Возвращает (отмечено, пропущено переменных).
+  Future<(int marked, int skippedVariable)> markPaidUntil(
+    DateTime through,
+    DateTime today,
+  ) async {
+    final active = await watchActive().first;
+    var marked = 0;
+    var skipped = 0;
+    for (final item in active) {
+      final due = dateOnly(item.payment.nextDueAt);
+      if (due.isAfter(dateOnly(through))) continue;
+      final amount = item.payment.amountKopecks;
+      if (amount == null) {
+        skipped++;
+        continue;
+      }
+      await markPaid(item.payment.id, amountKopecks: amount, paidAt: today);
+      marked++;
+    }
+    return (marked, skipped);
+  }
+
   /// Создаёт платёж; возвращает его id.
   Future<int> add(PaymentDraft draft) {
     _check(draft);

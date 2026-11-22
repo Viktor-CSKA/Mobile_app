@@ -463,4 +463,96 @@ void main() {
     expect(await repo.watchActive().first, isEmpty);
     expect(await repo.watchRecords(id).first, isEmpty);
   });
+
+  group('duplicate', () {
+    test('копия получает следующую дату и те же поля', () async {
+      final id = await repo.add(draft(due: DateTime(2026, 10, 15)));
+      final copyId = await repo.duplicate(id);
+      expect(copyId, isNot(id));
+
+      final list = await repo.watchActive().first;
+      expect(list.length, 2);
+      final original = list.singleWhere((e) => e.payment.id == id).payment;
+      final copy = list.singleWhere((e) => e.payment.id == copyId).payment;
+      expect(copy.name, original.name);
+      expect(copy.amountKopecks, 69000);
+      expect(copy.periodMonths, 1);
+      // Дата копии сдвинута на период вперёд, чтобы не совпасть с оригиналом.
+      expect(copy.nextDueAt, DateTime(2026, 11, 15));
+    });
+
+    test('дублирование несуществующего платежа бросает ошибку', () async {
+      expect(() => repo.duplicate(999), throwsStateError);
+    });
+  });
+
+  group('skipPeriod', () {
+    test('сдвигает ближайшую дату на период без записи в историю', () async {
+      final id = await repo.add(draft(due: DateTime(2026, 10, 15)));
+      final ok = await repo.skipPeriod(id);
+      expect(ok, isTrue);
+
+      final p = (await repo.watchActive().first).single.payment;
+      expect(p.nextDueAt, DateTime(2026, 11, 15));
+      // История оплат не пишется.
+      expect(await repo.watchRecords(id).first, isEmpty);
+    });
+
+    test('для завершённого платежа возвращает false', () async {
+      final id = await repo.add(
+        draft(
+          amount: 500000,
+          due: DateTime(2026, 10, 15),
+          ends: DateTime(2026, 10, 15),
+        ),
+      );
+      expect(await repo.skipPeriod(id), isFalse);
+    });
+  });
+
+  group('markPaidUntil', () {
+    final today = DateTime(2026, 10, 15);
+
+    test('отмечает платежи до даты, пропуская переменные', () async {
+      await repo.add(
+        draft(name: 'А', amount: 10000, due: DateTime(2026, 10, 20)),
+      );
+      await repo.add(
+        draft(name: 'Б', amount: 20000, due: DateTime(2026, 10, 25)),
+      );
+      await repo.add(
+        draft(name: 'Вода', amount: null, due: DateTime(2026, 10, 22)),
+      );
+      // За пределами периода.
+      await repo.add(
+        draft(name: 'Г', amount: 30000, due: DateTime(2026, 11, 5)),
+      );
+
+      final (marked, skipped) = await repo.markPaidUntil(
+        DateTime(2026, 10, 31),
+        today,
+      );
+      expect(marked, 2);
+      expect(skipped, 1);
+
+      final active = await repo.watchActive().first;
+      // Ежемесячные А и Б не исчезают, а сдвигаются на следующий период.
+      final byName = {for (final e in active) e.payment.name: e.payment};
+      expect(byName['А']!.nextDueAt, DateTime(2026, 11, 20));
+      expect(byName['Б']!.nextDueAt, DateTime(2026, 11, 25));
+      // Переменный и платёж за пределами периода остались на своих датах.
+      expect(byName['Вода']!.nextDueAt, DateTime(2026, 10, 22));
+      expect(byName['Г']!.nextDueAt, DateTime(2026, 11, 5));
+    });
+
+    test('без платежей до даты возвращает нули', () async {
+      await repo.add(draft(due: DateTime(2026, 11, 20)));
+      final (marked, skipped) = await repo.markPaidUntil(
+        DateTime(2026, 10, 31),
+        today,
+      );
+      expect(marked, 0);
+      expect(skipped, 0);
+    });
+  });
 }
